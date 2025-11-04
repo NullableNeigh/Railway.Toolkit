@@ -69,9 +69,6 @@ abstract partial record Result<T>
         global::System.Action<TState> @else
     );
 
-    public abstract Ok UnwrapOk();
-    public abstract Fail UnwrapFail();
-
     public static implicit operator Result<T>(T value) => new Ok(value);
     public static implicit operator Result<T>(Error value) => new Fail(value);
 
@@ -131,9 +128,6 @@ abstract partial record Result<T>
             global::System.Action<TState, Fail> @fail,
             global::System.Action<TState> @else
         ) => @else(state);
-
-        public override Ok UnwrapOk() => this;
-        public override Fail UnwrapFail() => throw new global::System.InvalidOperationException("Called `Result.UnwrapFail()` on `Ok` value.");
     }
     public sealed partial record Fail : Result<T>
     {
