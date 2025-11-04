@@ -191,9 +191,6 @@ abstract partial record Result<T>
             global::System.Action<TState, Fail> @fail,
             global::System.Action<TState> @else
         ) => @fail(state, this);
-
-        public override Ok UnwrapOk() => throw new global::System.InvalidOperationException("Called `Result.UnwrapOk()` on `Fail` value.");
-        public override Fail UnwrapFail() => this;
     }
 }
 
