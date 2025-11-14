@@ -153,4 +153,64 @@ public static class ResultErrorExtensions
             fail => alternativeFactory(fail.Error)
         );
     }
+
+    /// <summary>
+    /// Recovers from a failure by providing a fallback value.
+    /// Alias for OrElse.
+    /// </summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="result">The result to recover from.</param>
+    /// <param name="fallbackValue">The value to use if the result is a failure.</param>
+    /// <returns>The original result if Ok, or a new Ok result with the fallback value if Fail.</returns>
+    public static Result<T> Recover<T>(
+        this Result<T> result,
+        T fallbackValue)
+    {
+        return result.OrElse(fallbackValue);
+    }
+
+    /// <summary>
+    /// Recovers from a failure by providing a fallback value using a function.
+    /// Alias for OrElse.
+    /// </summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="result">The result to recover from.</param>
+    /// <param name="fallbackValueFactory">The function to create the fallback value.</param>
+    /// <returns>The original result if Ok, or a new Ok result with the computed fallback value if Fail.</returns>
+    public static Result<T> Recover<T>(
+        this Result<T> result,
+        Func<Error, T> fallbackValueFactory)
+    {
+        return result.OrElse(fallbackValueFactory);
+    }
+
+    /// <summary>
+    /// Recovers from a failure by providing an alternative Result.
+    /// Alias for OrElseWith.
+    /// </summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="result">The result to recover from.</param>
+    /// <param name="alternative">The alternative result to use if the current result is a failure.</param>
+    /// <returns>The original result if Ok, or the alternative result if Fail.</returns>
+    public static Result<T> RecoverWith<T>(
+        this Result<T> result,
+        Result<T> alternative)
+    {
+        return result.OrElseWith(alternative);
+    }
+
+    /// <summary>
+    /// Recovers from a failure by providing an alternative Result using a function.
+    /// Alias for OrElseWith.
+    /// </summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="result">The result to recover from.</param>
+    /// <param name="alternativeFactory">The function to create the alternative result.</param>
+    /// <returns>The original result if Ok, or the computed alternative result if Fail.</returns>
+    public static Result<T> RecoverWith<T>(
+        this Result<T> result,
+        Func<Error, Result<T>> alternativeFactory)
+    {
+        return result.OrElseWith(alternativeFactory);
+    }
 }
