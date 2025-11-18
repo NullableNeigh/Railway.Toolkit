@@ -1,3 +1,6 @@
 <Solution>
-  <Project Path="Railway.Toolkit/Railway.Toolkit.csproj" />
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="src/Railway.Toolkit/Railway.Toolkit.csproj" />
 </Solution>
