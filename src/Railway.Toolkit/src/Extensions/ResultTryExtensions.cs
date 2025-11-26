@@ -54,12 +54,12 @@ public static class ResultTryExtensions
     }
 
     /// <summary>
-    /// Wraps an action in a Result, returning a unit type (bool) on success.
+    /// Wraps an action in a Result, returning Unit on success.
     /// </summary>
     /// <param name="action">The action to execute.</param>
     /// <param name="errorCode">Optional error code to use when an exception is caught.</param>
-    /// <returns>Ok with true if successful, or Fail with the exception converted to an Error.</returns>
-    public static Result<bool> Try(
+    /// <returns>Ok with Unit if successful, or Fail with the exception converted to an Error.</returns>
+    public static Result<Unit> Try(
         Action action,
         string? errorCode = null)
     {
@@ -68,7 +68,7 @@ public static class ResultTryExtensions
         try
         {
             action();
-            return true;
+            return Unit.Value;
         }
         catch (Exception ex)
         {
@@ -77,12 +77,12 @@ public static class ResultTryExtensions
     }
 
     /// <summary>
-    /// Wraps an asynchronous action in a Result, returning a unit type (bool) on success.
+    /// Wraps an asynchronous action in a Result, returning Unit on success.
     /// </summary>
     /// <param name="action">The async action to execute.</param>
     /// <param name="errorCode">Optional error code to use when an exception is caught.</param>
-    /// <returns>A task containing Ok with true if successful, or Fail with the exception.</returns>
-    public static async Task<Result<bool>> TryAsync(
+    /// <returns>A task containing Ok with Unit if successful, or Fail with the exception.</returns>
+    public static async Task<Result<Unit>> TryAsync(
         Func<Task> action,
         string? errorCode = null)
     {
@@ -91,7 +91,7 @@ public static class ResultTryExtensions
         try
         {
             await action().ConfigureAwait(false);
-            return true;
+            return Unit.Value;
         }
         catch (Exception ex)
         {

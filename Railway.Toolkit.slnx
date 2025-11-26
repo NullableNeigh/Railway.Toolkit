@@ -3,4 +3,5 @@
     <File Path=".editorconfig" />
   </Folder>
   <Project Path="src/Railway.Toolkit/Railway.Toolkit.csproj" />
+  <Project Path="src/Railway.Toolkit.Tests/Railway.Toolkit.Tests.csproj" />
 </Solution>
