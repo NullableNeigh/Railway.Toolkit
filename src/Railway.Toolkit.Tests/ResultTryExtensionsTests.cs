@@ -1,0 +1,194 @@
+using Railway.Toolkit;
+
+namespace Railway.Toolkit.Tests;
+
+public class ResultTryExtensionsTests
+{
+    [Fact]
+    public void Try_WithSuccessfulFunc_ShouldReturnOk()
+    {
+        var result = ResultTryExtensions.Try(() => 42);
+
+        Assert.Equal(42, result.Match(ok => ok.Value, fail => 0));
+    }
+
+    [Fact]
+    public void Try_WithException_ShouldReturnFail()
+    {
+        var result = ResultTryExtensions.Try<int>(() => throw new InvalidOperationException("Test error"));
+
+        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.Equal("Test error", error.Message);
+        Assert.Equal("InvalidOperationException", error.Code);
+        Assert.NotNull(error.Exception);
+    }
+
+    [Fact]
+    public void Try_WithCustomErrorCode_ShouldUseCustomCode()
+    {
+        var result = ResultTryExtensions.Try<int>(() => throw new Exception("Test"), "CUSTOM");
+
+        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.Equal("CUSTOM", error.Code);
+    }
+
+    [Fact]
+    public void Try_WithAction_ShouldReturnUnit()
+    {
+        var executed = false;
+        var result = ResultTryExtensions.Try(() => executed = true);
+
+        Assert.True(executed);
+        Assert.Equal(Unit.Value, result.Match(ok => ok.Value, fail => default));
+    }
+
+    [Fact]
+    public void Try_WithActionException_ShouldReturnFail()
+    {
+        var result = ResultTryExtensions.Try(() => throw new Exception("Action failed"));
+
+        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.Equal("Action failed", error.Message);
+    }
+
+    [Fact]
+    public async Task TryAsync_WithSuccessfulFunc_ShouldReturnOk()
+    {
+        var result = await ResultTryExtensions.TryAsync(async () =>
+        {
+            await Task.Delay(1);
+            return 42;
+        });
+
+        Assert.Equal(42, result.Match(ok => ok.Value, fail => 0));
+    }
+
+    [Fact]
+    public async Task TryAsync_WithException_ShouldReturnFail()
+    {
+        var result = await ResultTryExtensions.TryAsync<int>(async () =>
+        {
+            await Task.Delay(1);
+            throw new InvalidOperationException("Async error");
+        });
+
+        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.Equal("Async error", error.Message);
+    }
+
+    [Fact]
+    public async Task TryAsync_WithAction_ShouldReturnUnit()
+    {
+        var executed = false;
+        var result = await ResultTryExtensions.TryAsync(async () =>
+        {
+            await Task.Delay(1);
+            executed = true;
+        });
+
+        Assert.True(executed);
+        Assert.Equal(Unit.Value, result.Match(ok => ok.Value, fail => default));
+    }
+
+    [Fact]
+    public void TryMap_WithSuccessfulMapper_ShouldReturnOk()
+    {
+        var result = Result.Ok(5);
+
+        var mapped = result.TryMap(x => x * 2);
+
+        Assert.Equal(10, mapped.Match(ok => ok.Value, fail => 0));
+    }
+
+    [Fact]
+    public void TryMap_WithExceptionInMapper_ShouldReturnFail()
+    {
+        var result = Result.Ok(5);
+
+        var mapped = result.TryMap<int, int>(x => throw new Exception("Map failed"));
+
+        var error = mapped.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.Equal("Map failed", error.Message);
+    }
+
+    [Fact]
+    public void TryMap_WithFailResult_ShouldPassThroughError()
+    {
+        var result = Result.Fail<int>("Original", "ORIG");
+
+        var mapped = result.TryMap(x => x * 2);
+
+        var error = mapped.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.Equal("Original", error!.Message);
+    }
+
+    [Fact]
+    public void TryBind_WithSuccessfulBinder_ShouldReturnOk()
+    {
+        var result = Result.Ok(5);
+
+        var bound = result.TryBind(x => Result.Ok(x * 2));
+
+        Assert.Equal(10, bound.Match(ok => ok.Value, fail => 0));
+    }
+
+    [Fact]
+    public void TryBind_WithExceptionInBinder_ShouldReturnFail()
+    {
+        var result = Result.Ok(5);
+
+        var bound = result.TryBind<int, int>(x => throw new Exception("Bind failed"));
+
+        var error = bound.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.Equal("Bind failed", error.Message);
+    }
+
+    [Fact]
+    public async Task TryMapAsync_WithAsyncMapper_ShouldWork()
+    {
+        var result = Result.Ok(5);
+
+        var mapped = await result.TryMapAsync(async x =>
+        {
+            await Task.Delay(1);
+            return x * 2;
+        });
+
+        Assert.Equal(10, mapped.Match(ok => ok.Value, fail => 0));
+    }
+
+    [Fact]
+    public async Task TryBindAsync_WithAsyncBinder_ShouldWork()
+    {
+        var result = Result.Ok(5);
+
+        var bound = await result.TryBindAsync(async x =>
+        {
+            await Task.Delay(1);
+            return Result.Ok(x * 2);
+        });
+
+        Assert.Equal(10, bound.Match(ok => ok.Value, fail => 0));
+    }
+
+    [Fact]
+    public void Try_BoundaryPattern_WrapsImperativeCode()
+    {
+        // Demonstrates using Try as boundary between imperative and functional
+        var imperativeResult = ResultTryExtensions.Try(() =>
+        {
+            var data = File.ReadAllText("nonexistent.txt");
+            return data.Length;
+        });
+
+        var error = imperativeResult.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.NotNull(error.Exception);
+    }
+}
