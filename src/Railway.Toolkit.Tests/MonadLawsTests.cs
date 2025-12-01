@@ -6,6 +6,7 @@ namespace Railway.Toolkit.Tests;
 /// Tests that Result<T> satisfies the monad laws.
 /// These laws ensure that the library behaves predictably and composably.
 /// </summary>
+[Trait("Category", "MonadLaws")]
 public class MonadLawsTests
 {
     // Monad Laws:

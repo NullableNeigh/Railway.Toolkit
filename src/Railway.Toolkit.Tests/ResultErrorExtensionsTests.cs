@@ -2,6 +2,7 @@ using Railway.Toolkit;
 
 namespace Railway.Toolkit.Tests;
 
+[Trait("Category", "Error")]
 public class ResultErrorExtensionsTests
 {
     [Fact]
@@ -158,5 +159,36 @@ public class ResultErrorExtensionsTests
         var error = mapped.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal("Async: Error", error.Message);
+    }
+
+    [Fact]
+    public async Task MapErrorAsync_WithTaskResult_ShouldTransformError()
+    {
+        var resultTask = Task.FromResult(Result.Fail<int>("Error", "TEST"));
+
+        var mapped = await resultTask.MapErrorAsync(e =>
+            Error.Create($"Transformed: {e.Message}", "TRANSFORMED"));
+
+        var error = mapped.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.Equal("Transformed: Error", error.Message);
+        Assert.Equal("TRANSFORMED", error.Code);
+    }
+
+    [Fact]
+    public async Task MapErrorAsync_WithTaskResultAndAsyncMapper_ShouldTransformError()
+    {
+        var resultTask = Task.FromResult(Result.Fail<int>("Error", "TEST"));
+
+        var mapped = await resultTask.MapErrorAsync(async e =>
+        {
+            await Task.Delay(1);
+            return Error.Create($"Async transformed: {e.Message}", "ASYNC_TRANSFORMED");
+        });
+
+        var error = mapped.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.Equal("Async transformed: Error", error.Message);
+        Assert.Equal("ASYNC_TRANSFORMED", error.Code);
     }
 }

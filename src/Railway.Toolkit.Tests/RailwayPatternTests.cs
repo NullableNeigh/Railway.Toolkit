@@ -6,6 +6,7 @@ namespace Railway.Toolkit.Tests;
 /// Tests that verify the core concepts of railway-oriented programming.
 /// These tests ensure the library correctly implements the railway metaphor.
 /// </summary>
+[Trait("Category", "Railway")]
 public class RailwayPatternTests
 {
     // Railway Pattern Concepts:
@@ -173,7 +174,7 @@ public class RailwayPatternTests
     public void CompleteUserValidationPipeline()
     {
         // Real-world example: user validation pipeline
-        var user = new User { Name = "John", Email = "john@example.com", Age = 25 };
+        var user = new User("John", "john@example.com", 25);
 
         var result = Railway.Start(user)
             .Ensure(u => !string.IsNullOrEmpty(u.Name), "Name is required", "NAME_REQUIRED")
@@ -187,7 +188,7 @@ public class RailwayPatternTests
     [Fact]
     public void CompleteUserValidationPipeline_WithFailure()
     {
-        var user = new User { Name = "", Email = "invalid", Age = 16 };
+        var user = new User("", "invalid", 16);
 
         var result = Railway.Start(user)
             .Ensure(u => !string.IsNullOrEmpty(u.Name), "Name is required", "NAME_REQUIRED")
@@ -200,10 +201,10 @@ public class RailwayPatternTests
     }
 
     [Fact]
-    public void AsyncRailway_MaintainsTwoTrackSemantics()
+    public async Task AsyncRailway_MaintainsTwoTrackSemantics()
     {
         // Async operations should maintain railway semantics
-        var result = Railway.Start(5)
+        var result = await Railway.Start(5)
             .Map(x => x * 2)
             .BindAsync(async x =>
             {
@@ -214,8 +215,7 @@ public class RailwayPatternTests
             {
                 await Task.Delay(1);
                 return x.ToString();
-            })
-            .Result; // .Result just for test simplicity
+            });
 
         Assert.Equal("13", result.Match(ok => ok.Value, fail => ""));
     }

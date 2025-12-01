@@ -2,6 +2,7 @@ using Railway.Toolkit;
 
 namespace Railway.Toolkit.Tests;
 
+[Trait("Category", "Combine")]
 public class ResultCombineTests
 {
     [Fact]
@@ -186,5 +187,16 @@ public class ResultCombineTests
         var error = combined.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal(2, error.InnerErrors!.Count);
+    }
+
+    [Fact]
+    public async Task ZipAsync_WithSelector_ShouldCombineValues()
+    {
+        var task1 = Task.FromResult(Result.Ok(5));
+        var task2 = Task.FromResult(Result.Ok(3));
+
+        var combined = await task1.ZipAsync(task2, (a, b) => a + b);
+
+        Assert.Equal(8, combined.Match(ok => ok.Value, fail => 0));
     }
 }

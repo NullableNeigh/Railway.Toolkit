@@ -2,6 +2,7 @@ using Railway.Toolkit;
 
 namespace Railway.Toolkit.Tests;
 
+[Trait("Category", "Collection")]
 public class ResultCollectionTests
 {
     [Fact]
@@ -227,5 +228,56 @@ public class ResultCollectionTests
 
         // Should process all 5 to collect all errors
         Assert.Equal(5, processedCount);
+    }
+
+    [Fact]
+    public async Task SequenceAsync_WithAllOk_ShouldFlipToOkList()
+    {
+        var resultTasks = new[]
+        {
+            Task.FromResult(Result.Ok(1)),
+            Task.FromResult(Result.Ok(2)),
+            Task.FromResult(Result.Ok(3))
+        };
+
+        var sequenced = await resultTasks.SequenceAsync();
+
+        var list = sequenced.Match(ok => ok.Value, fail => Array.Empty<int>());
+        Assert.Equal(3, list.Count);
+        Assert.Equal(new[] { 1, 2, 3 }, list);
+    }
+
+    [Fact]
+    public async Task SequenceAsync_WithOneFail_ShouldReturnFirstError()
+    {
+        var resultTasks = new[]
+        {
+            Task.FromResult(Result.Ok(1)),
+            Task.FromResult(Result.Fail<int>("Error", "ERR")),
+            Task.FromResult(Result.Ok(3))
+        };
+
+        var sequenced = await resultTasks.SequenceAsync();
+
+        var error = sequenced.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.Equal("Error", error.Message);
+    }
+
+    [Fact]
+    public async Task SequenceAllAsync_WithMultipleFails_ShouldAggregateErrors()
+    {
+        var resultTasks = new[]
+        {
+            Task.FromResult(Result.Fail<int>("Error 1", "ERR1")),
+            Task.FromResult(Result.Ok(2)),
+            Task.FromResult(Result.Fail<int>("Error 3", "ERR3"))
+        };
+
+        var sequenced = await resultTasks.SequenceAllAsync();
+
+        var error = sequenced.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.Equal(2, error.InnerErrors!.Count);
     }
 }

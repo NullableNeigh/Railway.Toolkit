@@ -2,6 +2,7 @@ using Railway.Toolkit;
 
 namespace Railway.Toolkit.Tests;
 
+[Trait("Category", "Tap")]
 public class ResultTapTests
 {
     [Fact]
@@ -124,7 +125,71 @@ public class ResultTapTests
             .Map(x => x * 2)
             .TapError(e => errorLog.Add($"Still error: {e.Code}"));
 
-        Assert.Single(errorLog);
+        Assert.Equal(2, errorLog.Count);
         Assert.Equal("Error: Failure", errorLog[0]);
+        Assert.Equal("Still error: TEST", errorLog[1]);
+    }
+
+    [Fact]
+    public async Task TapErrorAsync_WithTaskResult_ShouldExecuteOnError()
+    {
+        var errorMessage = "";
+        var resultTask = Task.FromResult(Result.Fail<int>("Failed", "ERR"));
+
+        var output = await resultTask.TapErrorAsync(e => errorMessage = e.Message);
+
+        Assert.Equal("Failed", errorMessage);
+        var error = output.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public async Task TapErrorAsync_WithAsyncAction_ShouldExecuteOnError()
+    {
+        var errorMessage = "";
+        var result = Result.Fail<int>("Failed", "ERR");
+
+        var output = await result.TapErrorAsync(async e =>
+        {
+            await Task.Delay(1);
+            errorMessage = e.Message;
+        });
+
+        Assert.Equal("Failed", errorMessage);
+        var error = output.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public async Task TapErrorAsync_WithTaskResultAndAsyncAction_ShouldExecuteOnError()
+    {
+        var errorMessage = "";
+        var resultTask = Task.FromResult(Result.Fail<int>("Failed", "ERR"));
+
+        var output = await resultTask.TapErrorAsync(async e =>
+        {
+            await Task.Delay(1);
+            errorMessage = e.Message;
+        });
+
+        Assert.Equal("Failed", errorMessage);
+        var error = output.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public async Task TapAsync_WithTaskResultAndAsyncAction_ShouldExecute()
+    {
+        var tapped = 0;
+        var resultTask = Task.FromResult(Result.Ok(42));
+
+        var output = await resultTask.TapAsync(async value =>
+        {
+            await Task.Delay(1);
+            tapped = value;
+        });
+
+        Assert.Equal(42, tapped);
+        Assert.Equal(42, output.Match(ok => ok.Value, fail => 0));
     }
 }

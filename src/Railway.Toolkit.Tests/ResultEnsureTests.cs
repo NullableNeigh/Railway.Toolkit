@@ -2,6 +2,7 @@ using Railway.Toolkit;
 
 namespace Railway.Toolkit.Tests;
 
+[Trait("Category", "Validation")]
 public class ResultEnsureTests
 {
     [Fact]
@@ -171,5 +172,50 @@ public class ResultEnsureTests
         Assert.NotNull(error);
         Assert.Equal("Must be less than 100", error.Message);
         Assert.Equal("TOO_LARGE", error.Code);
+    }
+
+    [Fact]
+    public async Task EnsureAsync_WithTaskResult_ShouldValidate()
+    {
+        var resultTask = Task.FromResult(Result.Ok(10));
+        var testError = Error.Create("Must be positive", "NEGATIVE");
+
+        var ensured = await resultTask.EnsureAsync(x => x > 0, testError);
+
+        var value = ensured.Match(ok => ok.Value, fail => -1);
+        Assert.Equal(10, value);
+    }
+
+    [Fact]
+    public async Task EnsureAsync_WithTaskResultAndAsyncPredicate_ShouldValidate()
+    {
+        var resultTask = Task.FromResult(Result.Ok(10));
+        var testError = Error.Create("Must be positive", "NEGATIVE");
+
+        var ensured = await resultTask.EnsureAsync(async x =>
+        {
+            await Task.Delay(1);
+            return x > 0;
+        }, testError);
+
+        var value = ensured.Match(ok => ok.Value, fail => -1);
+        Assert.Equal(10, value);
+    }
+
+    [Fact]
+    public async Task EnsureAsync_WithTaskResultAndAsyncPredicate_ShouldFailValidation()
+    {
+        var resultTask = Task.FromResult(Result.Ok(-5));
+        var testError = Error.Create("Must be positive", "NEGATIVE");
+
+        var ensured = await resultTask.EnsureAsync(async x =>
+        {
+            await Task.Delay(1);
+            return x > 0;
+        }, testError);
+
+        var error = ensured.Match(ok => (Error?)null, fail => fail.Error);
+        Assert.NotNull(error);
+        Assert.Equal("Must be positive", error.Message);
     }
 }

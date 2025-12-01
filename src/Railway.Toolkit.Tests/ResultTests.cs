@@ -2,6 +2,7 @@ using Railway.Toolkit;
 
 namespace Railway.Toolkit.Tests;
 
+[Trait("Category", "Core")]
 public class ResultTests
 {
     [Fact]
@@ -58,7 +59,7 @@ public class ResultTests
 
         var actualValue = result.Match(
             ok => ok.Value,
-            fail => null
+            fail => ""
         );
 
         Assert.Equal("test", actualValue);

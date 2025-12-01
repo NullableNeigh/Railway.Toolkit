@@ -2,6 +2,7 @@ using Railway.Toolkit;
 
 namespace Railway.Toolkit.Tests;
 
+[Trait("Category", "Try")]
 public class ResultTryExtensionsTests
 {
     [Fact]
@@ -38,10 +39,10 @@ public class ResultTryExtensionsTests
     public void Try_WithAction_ShouldReturnUnit()
     {
         var executed = false;
-        var result = ResultTryExtensions.Try(() => executed = true);
+        var result = ResultTryExtensions.Try(() => { executed = true; });
 
         Assert.True(executed);
-        Assert.Equal(Unit.Value, result.Match(ok => ok.Value, fail => default));
+        Assert.True(Unit.Value == result.Match(ok => ok.Value, fail => default));
     }
 
     [Fact]
@@ -91,7 +92,7 @@ public class ResultTryExtensionsTests
         });
 
         Assert.True(executed);
-        Assert.Equal(Unit.Value, result.Match(ok => ok.Value, fail => default));
+        Assert.True(Unit.Value == result.Match(ok => ok.Value, fail => default));
     }
 
     [Fact]

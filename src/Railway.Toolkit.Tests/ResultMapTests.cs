@@ -2,6 +2,7 @@ using Railway.Toolkit;
 
 namespace Railway.Toolkit.Tests;
 
+[Trait("Category", "Map")]
 public class ResultMapTests
 {
     [Fact]
@@ -57,7 +58,7 @@ public class ResultMapTests
     {
         var result = Result.Ok(5);
 
-        Assert.Throws<ArgumentNullException>(() => result.Map<int>(null!));
+        Assert.Throws<ArgumentNullException>(() => result.Map<int, int>(null!));
     }
 
     [Fact]

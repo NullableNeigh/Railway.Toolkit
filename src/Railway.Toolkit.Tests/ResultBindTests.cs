@@ -2,6 +2,7 @@ using Railway.Toolkit;
 
 namespace Railway.Toolkit.Tests;
 
+[Trait("Category", "Bind")]
 public class ResultBindTests
 {
     [Fact]
@@ -77,7 +78,7 @@ public class ResultBindTests
     {
         var result = Result.Ok(5);
 
-        Assert.Throws<ArgumentNullException>(() => result.Bind<int>(null!));
+        Assert.Throws<ArgumentNullException>(() => result.Bind<int, int>(null!));
     }
 
     [Fact]
