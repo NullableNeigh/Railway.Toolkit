@@ -21,12 +21,19 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        result.MatchOk(
-            ok => action(ok.Value),
-            () => { }
-        );
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        {
+            result.MatchOk(
+                ok =>
+                {
+                    action(ok.Value);
+                    RailwayLogging.Logger?.LogOperation("Tap", "executed", timer.Elapsed);
+                },
+                () => RailwayLogging.Logger?.LogOperation("Tap", "skipped (on failure track)", timer.Elapsed)
+            );
 
-        return result;
+            return result;
+        }
     }
 
     /// <summary>
@@ -44,12 +51,19 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        result.MatchFail(
-            fail => action(fail.Error),
-            () => { }
-        );
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        {
+            result.MatchFail(
+                fail =>
+                {
+                    action(fail.Error);
+                    RailwayLogging.Logger?.LogOperation("TapError", "executed", timer.Elapsed, fail.Error);
+                },
+                () => RailwayLogging.Logger?.LogOperation("TapError", "skipped (on success track)", timer.Elapsed)
+            );
 
-        return result;
+            return result;
+        }
     }
 
     /// <summary>
