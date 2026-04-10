@@ -8,9 +8,9 @@ public class ResultTests
     [Fact]
     public void Ok_ShouldCreateSuccessResult()
     {
-        var result = Result.Ok(42);
+        Result<int> result = Result.Ok(42);
 
-        var value = result.Match(
+        int value = result.Match(
             ok => ok.Value,
             fail => 0
         );
@@ -21,10 +21,10 @@ public class ResultTests
     [Fact]
     public void Fail_WithError_ShouldCreateFailureResult()
     {
-        var error = Error.Create("Test error", "TEST");
-        var result = Result.Fail<int>(error);
+        Error error = Error.Create("Test error", "TEST");
+        Result<int> result = Result.Fail<int>(error);
 
-        var errorValue = result.Match(
+        Error? errorValue = result.Match(
             ok => (Error?)null,
             fail => fail.Error
         );
@@ -37,9 +37,9 @@ public class ResultTests
     [Fact]
     public void Fail_WithMessageAndCode_ShouldCreateFailureResult()
     {
-        var result = Result.Fail<int>("Test error", "TEST");
+        Result<int> result = Result.Fail<int>("Test error", "TEST");
 
-        var errorValue = result.Match(
+        Error? errorValue = result.Match(
             ok => (Error?)null,
             fail => fail.Error
         );
@@ -53,11 +53,11 @@ public class ResultTests
     public void FromNullable_WithValue_ShouldReturnOk()
     {
         string? value = "test";
-        var error = Error.Create("Was null", "NULL");
+        Error error = Error.Create("Was null", "NULL");
 
-        var result = Result.FromNullable(value, error);
+        Result<string> result = Result.FromNullable(value, error);
 
-        var actualValue = result.Match(
+        string actualValue = result.Match(
             ok => ok.Value,
             fail => ""
         );
@@ -69,11 +69,11 @@ public class ResultTests
     public void FromNullable_WithNull_ShouldReturnFail()
     {
         string? value = null;
-        var error = Error.Create("Was null", "NULL");
+        Error error = Error.Create("Was null", "NULL");
 
-        var result = Result.FromNullable(value, error);
+        Result<string> result = Result.FromNullable(value, error);
 
-        var errorValue = result.Match(
+        Error? errorValue = result.Match(
             ok => (Error?)null,
             fail => fail.Error
         );
@@ -88,9 +88,9 @@ public class ResultTests
     {
         string? value = null;
 
-        var result = Result.FromNullable(value, "Was null", "NULL");
+        Result<string> result = Result.FromNullable(value, "Was null", "NULL");
 
-        var errorValue = result.Match(
+        Error? errorValue = result.Match(
             ok => (Error?)null,
             fail => fail.Error
         );
@@ -105,7 +105,7 @@ public class ResultTests
     {
         Result<int> result = 42;
 
-        var value = result.Match(
+        int value = result.Match(
             ok => ok.Value,
             fail => 0
         );
@@ -116,10 +116,10 @@ public class ResultTests
     [Fact]
     public void ImplicitConversion_FromError_ShouldCreateFail()
     {
-        var error = Error.Create("Test error", "TEST");
+        Error error = Error.Create("Test error", "TEST");
         Result<int> result = error;
 
-        var errorValue = result.Match(
+        Error? errorValue = result.Match(
             ok => (Error?)null,
             fail => fail.Error
         );
@@ -131,9 +131,9 @@ public class ResultTests
     [Fact]
     public void Match_WithOkResult_ShouldCallOkFunction()
     {
-        var result = Result.Ok(42);
+        Result<int> result = Result.Ok(42);
 
-        var output = result.Match(
+        string output = result.Match(
             ok => $"Success: {ok.Value}",
             fail => $"Error: {fail.Error.Message}"
         );
@@ -144,9 +144,9 @@ public class ResultTests
     [Fact]
     public void Match_WithFailResult_ShouldCallFailFunction()
     {
-        var result = Result.Fail<int>("Test error", "TEST");
+        Result<int> result = Result.Fail<int>("Test error", "TEST");
 
-        var output = result.Match(
+        string output = result.Match(
             ok => $"Success: {ok.Value}",
             fail => $"Error: {fail.Error.Message}"
         );
@@ -157,8 +157,8 @@ public class ResultTests
     [Fact]
     public void Match_WithActions_WithOkResult_ShouldCallOkAction()
     {
-        var result = Result.Ok(42);
-        var called = "";
+        Result<int> result = Result.Ok(42);
+        string called = "";
 
         result.Match(
             ok => called = "ok",
@@ -171,8 +171,8 @@ public class ResultTests
     [Fact]
     public void Match_WithActions_WithFailResult_ShouldCallFailAction()
     {
-        var result = Result.Fail<int>("Test error", "TEST");
-        var called = "";
+        Result<int> result = Result.Fail<int>("Test error", "TEST");
+        string called = "";
 
         result.Match(
             ok => called = "ok",
@@ -185,9 +185,9 @@ public class ResultTests
     [Fact]
     public void RailwayStart_ShouldCreateOkResult()
     {
-        var result = Railway.Start(42);
+        Result<int> result = Railway.Start(42);
 
-        var value = result.Match(
+        int value = result.Match(
             ok => ok.Value,
             fail => 0
         );

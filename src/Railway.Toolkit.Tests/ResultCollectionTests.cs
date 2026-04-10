@@ -8,11 +8,11 @@ public class ResultCollectionTests
     [Fact]
     public void Traverse_WithAllSuccess_ShouldReturnList()
     {
-        var numbers = new[] { 1, 2, 3, 4, 5 };
+        int[] numbers = new[] { 1, 2, 3, 4, 5 };
 
-        var result = numbers.Traverse(x => Result.Ok(x * 2));
+        Result<IReadOnlyList<int>> result = numbers.Traverse(x => Result.Ok(x * 2));
 
-        var list = result.Match(ok => ok.Value, fail => Array.Empty<int>());
+        IReadOnlyList<int> list = result.Match(ok => ok.Value, fail => Array.Empty<int>());
         Assert.Equal(5, list.Count);
         Assert.Equal(new[] { 2, 4, 6, 8, 10 }, list);
     }
@@ -20,13 +20,13 @@ public class ResultCollectionTests
     [Fact]
     public void Traverse_WithOneFail_ShouldReturnFirstError()
     {
-        var numbers = new[] { 1, 2, 3, 4, 5 };
+        int[] numbers = new[] { 1, 2, 3, 4, 5 };
 
-        var result = numbers.Traverse(x =>
+        Result<IReadOnlyList<int>> result = numbers.Traverse(x =>
             x == 3 ? Result.Fail<int>("Three failed", "FAIL") : Result.Ok(x * 2)
         );
 
-        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = result.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal("Three failed", error.Message);
     }
@@ -34,24 +34,24 @@ public class ResultCollectionTests
     [Fact]
     public void TraverseAll_WithAllSuccess_ShouldReturnList()
     {
-        var numbers = new[] { 1, 2, 3, 4, 5 };
+        int[] numbers = new[] { 1, 2, 3, 4, 5 };
 
-        var result = numbers.TraverseAll(x => Result.Ok(x * 2));
+        Result<IReadOnlyList<int>> result = numbers.TraverseAll(x => Result.Ok(x * 2));
 
-        var list = result.Match(ok => ok.Value, fail => Array.Empty<int>());
+        IReadOnlyList<int> list = result.Match(ok => ok.Value, fail => Array.Empty<int>());
         Assert.Equal(5, list.Count);
     }
 
     [Fact]
     public void TraverseAll_WithMultipleFails_ShouldAggregateErrors()
     {
-        var numbers = new[] { 1, 2, 3, 4, 5 };
+        int[] numbers = new[] { 1, 2, 3, 4, 5 };
 
-        var result = numbers.TraverseAll(x =>
+        Result<IReadOnlyList<int>> result = numbers.TraverseAll(x =>
             x % 2 == 0 ? Result.Fail<int>($"{x} is even", "EVEN") : Result.Ok(x)
         );
 
-        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = result.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.NotNull(error.InnerErrors);
         Assert.Equal(2, error.InnerErrors.Count);
@@ -62,16 +62,16 @@ public class ResultCollectionTests
     [Fact]
     public void Sequence_WithAllOk_ShouldFlipToOkList()
     {
-        var results = new[]
+        Result<int>[] results = new[]
         {
             Result.Ok(1),
             Result.Ok(2),
             Result.Ok(3)
         };
 
-        var sequenced = results.Sequence();
+        Result<IReadOnlyList<int>> sequenced = results.Sequence();
 
-        var list = sequenced.Match(ok => ok.Value, fail => Array.Empty<int>());
+        IReadOnlyList<int> list = sequenced.Match(ok => ok.Value, fail => Array.Empty<int>());
         Assert.Equal(3, list.Count);
         Assert.Equal(new[] { 1, 2, 3 }, list);
     }
@@ -79,16 +79,16 @@ public class ResultCollectionTests
     [Fact]
     public void Sequence_WithOneFail_ShouldReturnFirstError()
     {
-        var results = new[]
+        Result<int>[] results = new[]
         {
             Result.Ok(1),
             Result.Fail<int>("Error", "ERR"),
             Result.Ok(3)
         };
 
-        var sequenced = results.Sequence();
+        Result<IReadOnlyList<int>> sequenced = results.Sequence();
 
-        var error = sequenced.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = sequenced.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal("Error", error.Message);
     }
@@ -96,16 +96,16 @@ public class ResultCollectionTests
     [Fact]
     public void SequenceAll_WithMultipleFails_ShouldAggregateErrors()
     {
-        var results = new[]
+        Result<int>[] results = new[]
         {
             Result.Fail<int>("Error 1", "ERR1"),
             Result.Ok(2),
             Result.Fail<int>("Error 3", "ERR3")
         };
 
-        var sequenced = results.SequenceAll();
+        Result<IReadOnlyList<int>> sequenced = results.SequenceAll();
 
-        var error = sequenced.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = sequenced.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal(2, error.InnerErrors!.Count);
     }
@@ -113,7 +113,7 @@ public class ResultCollectionTests
     [Fact]
     public void Partition_ShouldSplitSuccessesAndFailures()
     {
-        var results = new[]
+        Result<int>[] results = new[]
         {
             Result.Ok(1),
             Result.Fail<int>("Error 2", "ERR2"),
@@ -122,7 +122,7 @@ public class ResultCollectionTests
             Result.Ok(5)
         };
 
-        var (successes, failures) = results.Partition();
+        (IReadOnlyList<int>? successes, IReadOnlyList<Error>? failures) = results.Partition();
 
         Assert.Equal(3, successes.Count);
         Assert.Equal(new[] { 1, 3, 5 }, successes);
@@ -134,7 +134,7 @@ public class ResultCollectionTests
     [Fact]
     public void Choose_ShouldExtractOnlySuccesses()
     {
-        var results = new[]
+        Result<int>[] results = new[]
         {
             Result.Ok(1),
             Result.Fail<int>("Error", "ERR"),
@@ -143,7 +143,7 @@ public class ResultCollectionTests
             Result.Ok(5)
         };
 
-        var successes = results.Choose();
+        IReadOnlyList<int> successes = results.Choose();
 
         Assert.Equal(3, successes.Count);
         Assert.Equal(new[] { 1, 3, 5 }, successes);
@@ -152,30 +152,30 @@ public class ResultCollectionTests
     [Fact]
     public async Task TraverseAsync_WithAsyncSelector_ShouldWork()
     {
-        var numbers = new[] { 1, 2, 3 };
+        int[] numbers = new[] { 1, 2, 3 };
 
-        var result = await numbers.TraverseAsync(async x =>
+        Result<IReadOnlyList<int>> result = await numbers.TraverseAsync(async x =>
         {
             await Task.Delay(1);
             return Result.Ok(x * 2);
         });
 
-        var list = result.Match(ok => ok.Value, fail => Array.Empty<int>());
+        IReadOnlyList<int> list = result.Match(ok => ok.Value, fail => Array.Empty<int>());
         Assert.Equal(new[] { 2, 4, 6 }, list);
     }
 
     [Fact]
     public async Task TraverseAllAsync_WithMultipleFails_ShouldAggregateErrors()
     {
-        var numbers = new[] { 1, 2, 3, 4 };
+        int[] numbers = new[] { 1, 2, 3, 4 };
 
-        var result = await numbers.TraverseAllAsync(async x =>
+        Result<IReadOnlyList<int>> result = await numbers.TraverseAllAsync(async x =>
         {
             await Task.Delay(1);
             return x % 2 == 0 ? Result.Fail<int>($"{x} even", "EVEN") : Result.Ok(x);
         });
 
-        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = result.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal(2, error.InnerErrors!.Count);
     }
@@ -184,15 +184,15 @@ public class ResultCollectionTests
     public void TraverseAll_ValidateAllPattern_ShowsAllValidationErrors()
     {
         // Real-world example: validating user input
-        var inputs = new[] { "invalid1", "valid", "invalid2" };
+        string[] inputs = new[] { "invalid1", "valid", "invalid2" };
 
-        var result = inputs.TraverseAll(input =>
+        Result<IReadOnlyList<string>> result = inputs.TraverseAll(input =>
             input.StartsWith("invalid")
                 ? Result.Fail<string>($"{input} is invalid", "INVALID")
                 : Result.Ok(input)
         );
 
-        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = result.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal(2, error.InnerErrors!.Count);
         // User sees all validation errors at once - critical for UX
@@ -201,10 +201,10 @@ public class ResultCollectionTests
     [Fact]
     public void Traverse_FailFastPattern_StopsOnFirstError()
     {
-        var processedCount = 0;
-        var numbers = new[] { 1, 2, 3, 4, 5 };
+        int processedCount = 0;
+        int[] numbers = new[] { 1, 2, 3, 4, 5 };
 
-        var result = numbers.Traverse(x =>
+        Result<IReadOnlyList<int>> result = numbers.Traverse(x =>
         {
             processedCount++;
             return x == 3 ? Result.Fail<int>("Fail", "ERR") : Result.Ok(x);
@@ -217,10 +217,10 @@ public class ResultCollectionTests
     [Fact]
     public void TraverseAll_ProcessesAllEvenOnError()
     {
-        var processedCount = 0;
-        var numbers = new[] { 1, 2, 3, 4, 5 };
+        int processedCount = 0;
+        int[] numbers = new[] { 1, 2, 3, 4, 5 };
 
-        var result = numbers.TraverseAll(x =>
+        Result<IReadOnlyList<int>> result = numbers.TraverseAll(x =>
         {
             processedCount++;
             return x == 3 ? Result.Fail<int>("Fail", "ERR") : Result.Ok(x);
@@ -233,16 +233,16 @@ public class ResultCollectionTests
     [Fact]
     public async Task SequenceAsync_WithAllOk_ShouldFlipToOkList()
     {
-        var resultTasks = new[]
+        Task<Result<int>>[] resultTasks = new[]
         {
             Task.FromResult(Result.Ok(1)),
             Task.FromResult(Result.Ok(2)),
             Task.FromResult(Result.Ok(3))
         };
 
-        var sequenced = await resultTasks.SequenceAsync();
+        Result<IReadOnlyList<int>> sequenced = await resultTasks.SequenceAsync();
 
-        var list = sequenced.Match(ok => ok.Value, fail => Array.Empty<int>());
+        IReadOnlyList<int> list = sequenced.Match(ok => ok.Value, fail => Array.Empty<int>());
         Assert.Equal(3, list.Count);
         Assert.Equal(new[] { 1, 2, 3 }, list);
     }
@@ -250,16 +250,16 @@ public class ResultCollectionTests
     [Fact]
     public async Task SequenceAsync_WithOneFail_ShouldReturnFirstError()
     {
-        var resultTasks = new[]
+        Task<Result<int>>[] resultTasks = new[]
         {
             Task.FromResult(Result.Ok(1)),
             Task.FromResult(Result.Fail<int>("Error", "ERR")),
             Task.FromResult(Result.Ok(3))
         };
 
-        var sequenced = await resultTasks.SequenceAsync();
+        Result<IReadOnlyList<int>> sequenced = await resultTasks.SequenceAsync();
 
-        var error = sequenced.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = sequenced.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal("Error", error.Message);
     }
@@ -267,16 +267,16 @@ public class ResultCollectionTests
     [Fact]
     public async Task SequenceAllAsync_WithMultipleFails_ShouldAggregateErrors()
     {
-        var resultTasks = new[]
+        Task<Result<int>>[] resultTasks = new[]
         {
             Task.FromResult(Result.Fail<int>("Error 1", "ERR1")),
             Task.FromResult(Result.Ok(2)),
             Task.FromResult(Result.Fail<int>("Error 3", "ERR3"))
         };
 
-        var sequenced = await resultTasks.SequenceAllAsync();
+        Result<IReadOnlyList<int>> sequenced = await resultTasks.SequenceAllAsync();
 
-        var error = sequenced.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = sequenced.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal(2, error.InnerErrors!.Count);
     }

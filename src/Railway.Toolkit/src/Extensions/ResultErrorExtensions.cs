@@ -40,7 +40,7 @@ public static class ResultErrorExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<T> result = await resultTask.ConfigureAwait(false);
         return result.MapError(mapper);
     }
 
@@ -76,7 +76,7 @@ public static class ResultErrorExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<T> result = await resultTask.ConfigureAwait(false);
         return await result.MapErrorAsync(mapper).ConfigureAwait(false);
     }
 

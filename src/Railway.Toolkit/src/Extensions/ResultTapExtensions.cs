@@ -65,7 +65,7 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<T> result = await resultTask.ConfigureAwait(false);
         return result.Tap(action);
     }
 
@@ -103,7 +103,7 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<T> result = await resultTask.ConfigureAwait(false);
         return await result.TapAsync(action).ConfigureAwait(false);
     }
 
@@ -120,7 +120,7 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<T> result = await resultTask.ConfigureAwait(false);
         return result.TapError(action);
     }
 
@@ -158,7 +158,7 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<T> result = await resultTask.ConfigureAwait(false);
         return await result.TapErrorAsync(action).ConfigureAwait(false);
     }
 }

@@ -2,3 +2,14 @@
 
 # IDE0130: Namespace does not match folder structure
 dotnet_diagnostic.IDE0130.severity = none
+
+# IDE0007: Use explicit type instead of 'var' (built-in types)
+csharp_style_var_for_built_in_types = false:error
+dotnet_diagnostic.IDE0007.severity = error
+
+# IDE0008: Use explicit type instead of 'var' (when type is apparent)
+csharp_style_var_when_type_is_apparent = false:error
+dotnet_diagnostic.IDE0008.severity = error
+
+# Use explicit type instead of 'var' (elsewhere)
+csharp_style_var_elsewhere = false:error

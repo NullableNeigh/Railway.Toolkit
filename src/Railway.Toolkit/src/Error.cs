@@ -59,7 +59,7 @@ namespace Railway.Toolkit
         /// <returns>An aggregate error containing all the individual errors.</returns>
         public static Error Aggregate(IEnumerable<Error> errors, string code = "AggregateError")
         {
-            var errorList = errors.ToList();
+            List<Error> errorList = errors.ToList();
 
             if (errorList.Count == 0)
             {
@@ -71,7 +71,7 @@ namespace Railway.Toolkit
                 return errorList[0];
             }
 
-            var message = $"{errorList.Count} errors occurred: {string.Join("; ", errorList.Select(e => e.Message))}";
+            string message = $"{errorList.Count} errors occurred: {string.Join("; ", errorList.Select(e => e.Message))}";
 
             return new Error
             {
@@ -90,7 +90,7 @@ namespace Railway.Toolkit
         /// <returns>An aggregate error containing all the individual errors.</returns>
         public static Error Aggregate(IEnumerable<Error> errors, string message, string code)
         {
-            var errorList = errors.ToList();
+            List<Error> errorList = errors.ToList();
 
             if (errorList.Count == 0)
             {

@@ -8,8 +8,8 @@ public class UnitTests
     [Fact]
     public void Unit_ShouldHaveSingletonValue()
     {
-        var unit1 = Unit.Value;
-        var unit2 = Unit.Value;
+        Unit unit1 = Unit.Value;
+        Unit unit2 = Unit.Value;
 
         Assert.Equal(unit1, unit2);
     }
@@ -17,7 +17,7 @@ public class UnitTests
     [Fact]
     public void Unit_ToString_ShouldReturnParentheses()
     {
-        var unit = Unit.Value;
+        Unit unit = Unit.Value;
 
         Assert.Equal("()", unit.ToString());
     }
@@ -25,9 +25,9 @@ public class UnitTests
     [Fact]
     public void Unit_CanBeUsedInResult()
     {
-        var result = Result.Ok(Unit.Value);
+        Result<Unit> result = Result.Ok(Unit.Value);
 
-        var value = result.Match(
+        Unit value = result.Match(
             ok => ok.Value,
             fail => default
         );
@@ -38,10 +38,10 @@ public class UnitTests
     [Fact]
     public void Try_WithAction_ReturnsUnitOnSuccess()
     {
-        var executed = false;
-        var result = ResultTryExtensions.Try(() => { executed = true; });
+        bool executed = false;
+        Result<Unit> result = ResultTryExtensions.Try(() => { executed = true; });
 
-        var value = result.Match(
+        Unit value = result.Match(
             ok => ok.Value,
             fail => default
         );
@@ -53,14 +53,14 @@ public class UnitTests
     [Fact]
     public async Task TryAsync_WithAction_ReturnsUnitOnSuccess()
     {
-        var executed = false;
-        var result = await ResultTryExtensions.TryAsync(async () =>
+        bool executed = false;
+        Result<Unit> result = await ResultTryExtensions.TryAsync(async () =>
         {
             await Task.Delay(1);
             executed = true;
         });
 
-        var value = result.Match(
+        Unit value = result.Match(
             ok => ok.Value,
             fail => default
         );
@@ -72,11 +72,11 @@ public class UnitTests
     [Fact]
     public void Unit_InPipeline_CanBeChained()
     {
-        var result = Railway.Start(Unit.Value)
+        Result<string> result = Railway.Start(Unit.Value)
             .Map(_ => 42)
             .Map(x => x.ToString());
 
-        var value = result.Match(
+        string value = result.Match(
             ok => ok.Value,
             fail => ""
         );

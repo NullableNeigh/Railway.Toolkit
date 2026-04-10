@@ -7,15 +7,15 @@ public class SimpleTest
     [Fact]
     public void CanCreateResult()
     {
-        var result = Result.Ok(5);
+        Result<int> result = Result.Ok(5);
         Assert.NotNull(result);
     }
 
     [Fact]
     public void CanUseMap()
     {
-        var result = Result.Ok(5);
-        var mapped = ResultMapExtensions.Map(result, x => x * 2);
+        Result<int> result = Result.Ok(5);
+        Result<int> mapped = ResultMapExtensions.Map(result, x => x * 2);
         Assert.NotNull(mapped);
     }
 }

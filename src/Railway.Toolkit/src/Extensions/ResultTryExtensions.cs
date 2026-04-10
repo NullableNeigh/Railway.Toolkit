@@ -44,7 +44,7 @@ public static class ResultTryExtensions
 
         try
         {
-            var result = await func().ConfigureAwait(false);
+            T? result = await func().ConfigureAwait(false);
             return result;
         }
         catch (Exception ex)
@@ -153,7 +153,7 @@ public static class ResultTryExtensions
             {
                 try
                 {
-                    var value = await mapper(ok.Value).ConfigureAwait(false);
+                    TOut? value = await mapper(ok.Value).ConfigureAwait(false);
                     return value;
                 }
                 catch (Exception ex)

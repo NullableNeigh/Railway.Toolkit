@@ -42,7 +42,7 @@ public static class ResultBindExtensions
     {
         ArgumentNullException.ThrowIfNull(binder);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<TIn> result = await resultTask.ConfigureAwait(false);
         return result.Bind(binder);
     }
 
@@ -80,7 +80,7 @@ public static class ResultBindExtensions
     {
         ArgumentNullException.ThrowIfNull(binder);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<TIn> result = await resultTask.ConfigureAwait(false);
         return await result.BindAsync(binder).ConfigureAwait(false);
     }
 }

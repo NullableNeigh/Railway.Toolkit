@@ -8,11 +8,11 @@ public class ResultMapTests
     [Fact]
     public void Map_WithOkResult_ShouldTransformValue()
     {
-        var result = Result.Ok(5);
+        Result<int> result = Result.Ok(5);
 
-        var mapped = result.Map(x => x * 2);
+        Result<int> mapped = result.Map(x => x * 2);
 
-        var value = mapped.Match(
+        int value = mapped.Match(
             ok => ok.Value,
             fail => 0
         );
@@ -23,12 +23,12 @@ public class ResultMapTests
     [Fact]
     public void Map_WithFailResult_ShouldPassThroughError()
     {
-        var error = Error.Create("Test error", "TEST");
-        var result = Result.Fail<int>(error);
+        Error error = Error.Create("Test error", "TEST");
+        Result<int> result = Result.Fail<int>(error);
 
-        var mapped = result.Map(x => x * 2);
+        Result<int> mapped = result.Map(x => x * 2);
 
-        var errorValue = mapped.Match(
+        Error? errorValue = mapped.Match(
             ok => (Error?)null,
             fail => fail.Error
         );
@@ -41,11 +41,11 @@ public class ResultMapTests
     [Fact]
     public void Map_ShouldChangeType()
     {
-        var result = Result.Ok(42);
+        Result<int> result = Result.Ok(42);
 
-        var mapped = result.Map(x => x.ToString());
+        Result<string> mapped = result.Map(x => x.ToString());
 
-        var value = mapped.Match(
+        string value = mapped.Match(
             ok => ok.Value,
             fail => ""
         );
@@ -56,7 +56,7 @@ public class ResultMapTests
     [Fact]
     public void Map_WithNullMapper_ShouldThrowArgumentNullException()
     {
-        var result = Result.Ok(5);
+        Result<int> result = Result.Ok(5);
 
         Assert.Throws<ArgumentNullException>(() => result.Map<int, int>(null!));
     }
@@ -64,11 +64,11 @@ public class ResultMapTests
     [Fact]
     public async Task MapAsync_WithTaskResult_ShouldTransformValue()
     {
-        var resultTask = Task.FromResult(Result.Ok(5));
+        Task<Result<int>> resultTask = Task.FromResult(Result.Ok(5));
 
-        var mapped = await resultTask.MapAsync(x => x * 2);
+        Result<int> mapped = await resultTask.MapAsync(x => x * 2);
 
-        var value = mapped.Match(
+        int value = mapped.Match(
             ok => ok.Value,
             fail => 0
         );
@@ -79,15 +79,15 @@ public class ResultMapTests
     [Fact]
     public async Task MapAsync_WithAsyncMapper_ShouldTransformValue()
     {
-        var result = Result.Ok(5);
+        Result<int> result = Result.Ok(5);
 
-        var mapped = await result.MapAsync(async x =>
+        Result<int> mapped = await result.MapAsync(async x =>
         {
             await Task.Delay(1);
             return x * 2;
         });
 
-        var value = mapped.Match(
+        int value = mapped.Match(
             ok => ok.Value,
             fail => 0
         );
@@ -98,15 +98,15 @@ public class ResultMapTests
     [Fact]
     public async Task MapAsync_WithTaskResultAndAsyncMapper_ShouldTransformValue()
     {
-        var resultTask = Task.FromResult(Result.Ok(5));
+        Task<Result<int>> resultTask = Task.FromResult(Result.Ok(5));
 
-        var mapped = await resultTask.MapAsync(async x =>
+        Result<int> mapped = await resultTask.MapAsync(async x =>
         {
             await Task.Delay(1);
             return x * 2;
         });
 
-        var value = mapped.Match(
+        int value = mapped.Match(
             ok => ok.Value,
             fail => 0
         );
@@ -117,12 +117,12 @@ public class ResultMapTests
     [Fact]
     public void Map_CanChainMultipleTimes()
     {
-        var result = Railway.Start(5)
+        Result<string> result = Railway.Start(5)
             .Map(x => x * 2)
             .Map(x => x + 3)
             .Map(x => x.ToString());
 
-        var value = result.Match(
+        string value = result.Match(
             ok => ok.Value,
             fail => ""
         );
@@ -133,14 +133,14 @@ public class ResultMapTests
     [Fact]
     public void Map_WithFailInChain_ShouldSkipRemainingMaps()
     {
-        var error = Error.Create("Test error", "TEST");
+        Error error = Error.Create("Test error", "TEST");
         Result<int> result = error;
 
-        var mapped = result
+        Result<int> mapped = result
             .Map(x => x * 2)
             .Map(x => x + 3);
 
-        var errorValue = mapped.Match(
+        Error? errorValue = mapped.Match(
             ok => (Error?)null,
             fail => fail.Error
         );

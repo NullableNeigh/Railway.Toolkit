@@ -41,7 +41,7 @@ public static class Result
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(code);
 
-        var error = Error.Create(message, code);
+        Error error = Error.Create(message, code);
         return new Result<T>.Fail(error);
     }
 

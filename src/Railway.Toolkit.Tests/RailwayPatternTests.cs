@@ -19,9 +19,9 @@ public class RailwayPatternTests
     public void SuccessTrack_OperationsContinue()
     {
         // All operations on success track should execute
-        var executionLog = new List<string>();
+        List<string> executionLog = new List<string>();
 
-        var result = Railway.Start(5)
+        Result<string> result = Railway.Start(5)
             .Map(x => { executionLog.Add("Map1"); return x * 2; })
             .Bind(x => { executionLog.Add("Bind1"); return Result.Ok(x + 3); })
             .Map(x => { executionLog.Add("Map2"); return x.ToString(); });
@@ -34,9 +34,9 @@ public class RailwayPatternTests
     public void FailureTrack_OperationsShortCircuit()
     {
         // Once on failure track, operations should be skipped
-        var executionLog = new List<string>();
+        List<string> executionLog = new List<string>();
 
-        var result = Railway.Start(5)
+        Result<string> result = Railway.Start(5)
             .Map(x => { executionLog.Add("Map1"); return x * 2; })
             .Bind(x => { executionLog.Add("Bind1"); return Result.Fail<int>("Error", "TEST"); })
             .Map(x => { executionLog.Add("Map2 - should not execute"); return x.ToString(); })
@@ -46,7 +46,7 @@ public class RailwayPatternTests
         Assert.DoesNotContain("Map2", executionLog);
         Assert.DoesNotContain("Bind2", executionLog);
 
-        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = result.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal("Error", error.Message);
     }
@@ -55,13 +55,13 @@ public class RailwayPatternTests
     public void Bind_SwitchesToFailureTrack()
     {
         // Bind can switch from success to failure track
-        var result = Railway.Start(150)
+        Result<int> result = Railway.Start(150)
             .Bind(x => x > 100
                 ? Result.Fail<int>("Too large", "TOO_LARGE")
                 : Result.Ok(x)
             );
 
-        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = result.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal("Too large", error.Message);
     }
@@ -70,10 +70,10 @@ public class RailwayPatternTests
     public void Ensure_SwitchesToFailureTrack()
     {
         // Ensure can switch from success to failure track
-        var result = Railway.Start(-5)
+        Result<int> result = Railway.Start(-5)
             .Ensure(x => x >= 0, "Must be non-negative", "NEGATIVE");
 
-        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = result.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal("Must be non-negative", error.Message);
     }
@@ -82,7 +82,7 @@ public class RailwayPatternTests
     public void Recover_SwitchesBackToSuccessTrack()
     {
         // Recover can switch from failure back to success track
-        var result = Railway.Start(5)
+        Result<int> result = Railway.Start(5)
             .Bind(x => Result.Fail<int>("Error", "ERR"))
             .Recover(0)
             .Map(x => x + 10);
@@ -94,15 +94,15 @@ public class RailwayPatternTests
     public void Match_HandlesEndOfRailway()
     {
         // Match must handle both tracks at the end
-        var successResult = Railway.Start(5).Map(x => x * 2);
-        var failureResult = Railway.Start(5).Bind(x => Result.Fail<int>("Error", "ERR"));
+        Result<int> successResult = Railway.Start(5).Map(x => x * 2);
+        Result<int> failureResult = Railway.Start(5).Bind(x => Result.Fail<int>("Error", "ERR"));
 
-        var successOutput = successResult.Match(
+        string successOutput = successResult.Match(
             ok => $"Success: {ok.Value}",
             fail => $"Failure: {fail.Error.Message}"
         );
 
-        var failureOutput = failureResult.Match(
+        string failureOutput = failureResult.Match(
             ok => $"Success: {ok.Value}",
             fail => $"Failure: {fail.Error.Message}"
         );
@@ -115,7 +115,7 @@ public class RailwayPatternTests
     public void TwoTrackInput_OneTrackOutput_Pattern()
     {
         // Classic railway pattern: multiple two-track inputs combine to single output
-        var result = Railway.Start(10)
+        string result = Railway.Start(10)
             .Bind(ValidatePositive)
             .Bind(ValidateLessThan100)
             .Bind(ValidateEven)
@@ -131,12 +131,12 @@ public class RailwayPatternTests
     public void ErrorPropagation_MaintainsFirstError()
     {
         // First error should propagate through the railway
-        var result = Railway.Start(5)
+        Result<int> result = Railway.Start(5)
             .Bind(x => Result.Fail<int>("First error", "ERR1"))
             .Bind(x => Result.Fail<int>("Second error", "ERR2"))
             .Map(x => x * 2);
 
-        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = result.Match(ok => (Error?)null, fail => fail.Error);
         Assert.Equal("First error", error!.Message);
         Assert.Equal("ERR1", error.Code);
     }
@@ -145,9 +145,9 @@ public class RailwayPatternTests
     public void Tap_PeeksWithoutSwitchingTracks()
     {
         // Tap should observe but not change tracks
-        var tappedValue = 0;
+        int tappedValue = 0;
 
-        var result = Railway.Start(5)
+        Result<int> result = Railway.Start(5)
             .Tap(x => tappedValue = x)
             .Map(x => x * 2);
 
@@ -159,9 +159,9 @@ public class RailwayPatternTests
     public void TapError_ObservesFailureTrackOnly()
     {
         // TapError should only execute on failure track
-        var errorMessage = "";
+        string errorMessage = "";
 
-        var result = Railway.Start(5)
+        Result<int> result = Railway.Start(5)
             .TapError(e => errorMessage = "Should not execute")
             .Bind(x => Result.Fail<int>("Error", "ERR"))
             .TapError(e => errorMessage = e.Message)
@@ -174,9 +174,9 @@ public class RailwayPatternTests
     public void CompleteUserValidationPipeline()
     {
         // Real-world example: user validation pipeline
-        var user = new User("John", "john@example.com", 25);
+        User user = new User("John", "john@example.com", 25);
 
-        var result = Railway.Start(user)
+        Result<ValidatedUser> result = Railway.Start(user)
             .Ensure(u => !string.IsNullOrEmpty(u.Name), "Name is required", "NAME_REQUIRED")
             .Ensure(u => u.Email.Contains("@"), "Invalid email", "INVALID_EMAIL")
             .Ensure(u => u.Age >= 18, "Must be 18 or older", "UNDERAGE")
@@ -188,14 +188,14 @@ public class RailwayPatternTests
     [Fact]
     public void CompleteUserValidationPipeline_WithFailure()
     {
-        var user = new User("", "invalid", 16);
+        User user = new User("", "invalid", 16);
 
-        var result = Railway.Start(user)
+        Result<User> result = Railway.Start(user)
             .Ensure(u => !string.IsNullOrEmpty(u.Name), "Name is required", "NAME_REQUIRED")
             .Ensure(u => u.Email.Contains("@"), "Invalid email", "INVALID_EMAIL")
             .Ensure(u => u.Age >= 18, "Must be 18 or older", "UNDERAGE");
 
-        var error = result.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = result.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
         Assert.Equal("Name is required", error.Message); // First failure
     }
@@ -204,7 +204,7 @@ public class RailwayPatternTests
     public async Task AsyncRailway_MaintainsTwoTrackSemantics()
     {
         // Async operations should maintain railway semantics
-        var result = await Railway.Start(5)
+        Result<string> result = await Railway.Start(5)
             .Map(x => x * 2)
             .BindAsync(async x =>
             {

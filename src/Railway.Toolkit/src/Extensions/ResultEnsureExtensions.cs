@@ -71,7 +71,7 @@ public static class ResultEnsureExtensions
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(errorMessage);
 
-        var error = Error.Create(errorMessage, errorCode);
+        Error error = Error.Create(errorMessage, errorCode);
         return result.Ensure(predicate, error);
     }
 
@@ -91,7 +91,7 @@ public static class ResultEnsureExtensions
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<T> result = await resultTask.ConfigureAwait(false);
         return result.Ensure(predicate, error);
     }
 
@@ -114,7 +114,7 @@ public static class ResultEnsureExtensions
         return await result.Match<Task<Result<T>>>(
             async ok =>
             {
-                var isValid = await predicate(ok.Value).ConfigureAwait(false);
+                bool isValid = await predicate(ok.Value).ConfigureAwait(false);
                 return isValid ? ok.Value : error;
             },
             fail => Task.FromResult<Result<T>>(fail.Error)
@@ -137,7 +137,7 @@ public static class ResultEnsureExtensions
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<T> result = await resultTask.ConfigureAwait(false);
         return await result.EnsureAsync(predicate, error).ConfigureAwait(false);
     }
 
@@ -176,8 +176,8 @@ public static class ResultEnsureExtensions
     {
         ArgumentNullException.ThrowIfNull(validations);
 
-        var currentResult = result;
-        foreach (var (predicate, error) in validations)
+        Result<T> currentResult = result;
+        foreach ((Func<T, bool>? predicate, Error? error) in validations)
         {
             currentResult = currentResult.Ensure(predicate, error);
             // Short-circuit if we've already failed

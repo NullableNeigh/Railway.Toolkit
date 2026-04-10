@@ -42,7 +42,7 @@ public static class ResultMapExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<TIn> result = await resultTask.ConfigureAwait(false);
         return result.Map(mapper);
     }
 
@@ -82,7 +82,7 @@ public static class ResultMapExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        var result = await resultTask.ConfigureAwait(false);
+        Result<TIn> result = await resultTask.ConfigureAwait(false);
         return await result.MapAsync(mapper).ConfigureAwait(false);
     }
 }

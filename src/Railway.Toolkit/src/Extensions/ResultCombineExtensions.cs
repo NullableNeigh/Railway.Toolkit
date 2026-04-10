@@ -88,8 +88,8 @@ public static class ResultCombineExtensions
         this Task<Result<T1>> firstTask,
         Task<Result<T2>> secondTask)
     {
-        var first = await firstTask.ConfigureAwait(false);
-        var second = await secondTask.ConfigureAwait(false);
+        Result<T1> first = await firstTask.ConfigureAwait(false);
+        Result<T2> second = await secondTask.ConfigureAwait(false);
         return first.Zip(second);
     }
 
@@ -103,8 +103,8 @@ public static class ResultCombineExtensions
     {
         ArgumentNullException.ThrowIfNull(selector);
 
-        var first = await firstTask.ConfigureAwait(false);
-        var second = await secondTask.ConfigureAwait(false);
+        Result<T1> first = await firstTask.ConfigureAwait(false);
+        Result<T2> second = await secondTask.ConfigureAwait(false);
         return first.Zip(second, selector);
     }
 
@@ -119,11 +119,11 @@ public static class ResultCombineExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
-        var values = new List<T>();
+        List<T> values = new List<T>();
 
-        foreach (var result in results)
+        foreach (Result<T> result in results)
         {
-            var matched = result.Match<(bool isOk, T? value, Error? error)>(
+            (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
                 ok => (true, ok.Value, null),
                 fail => (false, default, fail.Error)
             );
@@ -147,11 +147,11 @@ public static class ResultCombineExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
-        var values = new List<T>();
+        List<T> values = new List<T>();
 
-        foreach (var result in results)
+        foreach (Result<T> result in results)
         {
-            var matched = result.Match<(bool isOk, T? value, Error? error)>(
+            (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
                 ok => (true, ok.Value, null),
                 fail => (false, default, fail.Error)
             );
@@ -189,10 +189,10 @@ public static class ResultCombineExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
-        var values = new List<T>();
-        var errors = new List<Error>();
+        List<T> values = new List<T>();
+        List<Error> errors = new List<Error>();
 
-        foreach (var result in results)
+        foreach (Result<T> result in results)
         {
             result.Match(
                 ok => values.Add(ok.Value),
@@ -216,7 +216,7 @@ public static class ResultCombineExtensions
     {
         ArgumentNullException.ThrowIfNull(resultTasks);
 
-        var results = await Task.WhenAll(resultTasks).ConfigureAwait(false);
+        Result<T>[] results = await Task.WhenAll(resultTasks).ConfigureAwait(false);
         return Combine(results);
     }
 
@@ -227,7 +227,7 @@ public static class ResultCombineExtensions
     {
         ArgumentNullException.ThrowIfNull(resultTasks);
 
-        var results = await Task.WhenAll(resultTasks).ConfigureAwait(false);
+        Result<T>[] results = await Task.WhenAll(resultTasks).ConfigureAwait(false);
         return CombineAll(results);
     }
 }

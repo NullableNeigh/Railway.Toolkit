@@ -22,13 +22,13 @@ public static class ResultCollectionExtensions
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
-        var results = new List<TOut>();
+        List<TOut> results = new List<TOut>();
 
-        foreach (var item in source)
+        foreach (TIn? item in source)
         {
-            var result = selector(item);
+            Result<TOut> result = selector(item);
 
-            var matched = result.Match<(bool isOk, TOut? value, Error? error)>(
+            (bool isOk, TOut? value, Error? error) matched = result.Match<(bool isOk, TOut? value, Error? error)>(
                 ok => (true, ok.Value, null),
                 fail => (false, default, fail.Error)
             );
@@ -60,12 +60,12 @@ public static class ResultCollectionExtensions
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
-        var results = new List<TOut>();
-        var errors = new List<Error>();
+        List<TOut> results = new List<TOut>();
+        List<Error> errors = new List<Error>();
 
-        foreach (var item in source)
+        foreach (TIn? item in source)
         {
-            var result = selector(item);
+            Result<TOut> result = selector(item);
 
             result.Match(
                 ok => results.Add(ok.Value),
@@ -97,13 +97,13 @@ public static class ResultCollectionExtensions
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
-        var results = new List<TOut>();
+        List<TOut> results = new List<TOut>();
 
-        foreach (var item in source)
+        foreach (TIn? item in source)
         {
-            var result = await selector(item).ConfigureAwait(false);
+            Result<TOut> result = await selector(item).ConfigureAwait(false);
 
-            var matched = result.Match<(bool isOk, TOut? value, Error? error)>(
+            (bool isOk, TOut? value, Error? error) matched = result.Match<(bool isOk, TOut? value, Error? error)>(
                 ok => (true, ok.Value, null),
                 fail => (false, default, fail.Error)
             );
@@ -135,12 +135,12 @@ public static class ResultCollectionExtensions
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
-        var results = new List<TOut>();
-        var errors = new List<Error>();
+        List<TOut> results = new List<TOut>();
+        List<Error> errors = new List<Error>();
 
-        foreach (var item in source)
+        foreach (TIn? item in source)
         {
-            var result = await selector(item).ConfigureAwait(false);
+            Result<TOut> result = await selector(item).ConfigureAwait(false);
 
             result.Match(
                 ok => results.Add(ok.Value),
@@ -167,11 +167,11 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
-        var values = new List<T>();
+        List<T> values = new List<T>();
 
-        foreach (var result in results)
+        foreach (Result<T> result in results)
         {
-            var matched = result.Match<(bool isOk, T? value, Error? error)>(
+            (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
                 ok => (true, ok.Value, null),
                 fail => (false, default, fail.Error)
             );
@@ -198,10 +198,10 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
-        var values = new List<T>();
-        var errors = new List<Error>();
+        List<T> values = new List<T>();
+        List<Error> errors = new List<Error>();
 
-        foreach (var result in results)
+        foreach (Result<T> result in results)
         {
             result.Match(
                 ok => values.Add(ok.Value),
@@ -229,13 +229,13 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(resultTasks);
 
-        var values = new List<T>();
+        List<T> values = new List<T>();
 
-        foreach (var resultTask in resultTasks)
+        foreach (Task<Result<T>> resultTask in resultTasks)
         {
-            var result = await resultTask.ConfigureAwait(false);
+            Result<T> result = await resultTask.ConfigureAwait(false);
 
-            var matched = result.Match<(bool isOk, T? value, Error? error)>(
+            (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
                 ok => (true, ok.Value, null),
                 fail => (false, default, fail.Error)
             );
@@ -263,12 +263,12 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(resultTasks);
 
-        var values = new List<T>();
-        var errors = new List<Error>();
+        List<T> values = new List<T>();
+        List<Error> errors = new List<Error>();
 
-        foreach (var resultTask in resultTasks)
+        foreach (Task<Result<T>> resultTask in resultTasks)
         {
-            var result = await resultTask.ConfigureAwait(false);
+            Result<T> result = await resultTask.ConfigureAwait(false);
 
             result.Match(
                 ok => values.Add(ok.Value),
@@ -295,10 +295,10 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
-        var successes = new List<T>();
-        var failures = new List<Error>();
+        List<T> successes = new List<T>();
+        List<Error> failures = new List<Error>();
 
-        foreach (var result in results)
+        foreach (Result<T> result in results)
         {
             result.Match(
                 ok => successes.Add(ok.Value),
@@ -319,9 +319,9 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
-        var values = new List<T>();
+        List<T> values = new List<T>();
 
-        foreach (var result in results)
+        foreach (Result<T> result in results)
         {
             result.MatchOk(
                 ok => values.Add(ok.Value),

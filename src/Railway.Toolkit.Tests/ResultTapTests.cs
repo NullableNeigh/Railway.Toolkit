@@ -8,10 +8,10 @@ public class ResultTapTests
     [Fact]
     public void Tap_WithOkResult_ShouldExecuteAction()
     {
-        var result = Result.Ok(42);
-        var tapped = 0;
+        Result<int> result = Result.Ok(42);
+        int tapped = 0;
 
-        var output = result.Tap(value => tapped = value);
+        Result<int> output = result.Tap(value => tapped = value);
 
         Assert.Equal(42, tapped);
         Assert.Equal(42, output.Match(ok => ok.Value, fail => 0));
@@ -20,22 +20,22 @@ public class ResultTapTests
     [Fact]
     public void Tap_WithFailResult_ShouldNotExecuteAction()
     {
-        var result = Result.Fail<int>("Error", "TEST");
-        var executed = false;
+        Result<int> result = Result.Fail<int>("Error", "TEST");
+        bool executed = false;
 
-        var output = result.Tap(value => executed = true);
+        Result<int> output = result.Tap(value => executed = true);
 
         Assert.False(executed);
-        var error = output.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = output.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
     }
 
     [Fact]
     public void Tap_ShouldReturnOriginalResult()
     {
-        var result = Result.Ok(42);
+        Result<int> result = Result.Ok(42);
 
-        var output = result.Tap(value => { });
+        Result<int> output = result.Tap(value => { });
 
         Assert.Equal(42, output.Match(ok => ok.Value, fail => 0));
     }
@@ -43,10 +43,10 @@ public class ResultTapTests
     [Fact]
     public void TapError_WithOkResult_ShouldNotExecuteAction()
     {
-        var result = Result.Ok(42);
-        var executed = false;
+        Result<int> result = Result.Ok(42);
+        bool executed = false;
 
-        var output = result.TapError(error => executed = true);
+        Result<int> output = result.TapError(error => executed = true);
 
         Assert.False(executed);
         Assert.Equal(42, output.Match(ok => ok.Value, fail => 0));
@@ -55,24 +55,24 @@ public class ResultTapTests
     [Fact]
     public void TapError_WithFailResult_ShouldExecuteAction()
     {
-        var result = Result.Fail<int>("Test error", "TEST");
+        Result<int> result = Result.Fail<int>("Test error", "TEST");
         Error? tappedError = null;
 
-        var output = result.TapError(error => tappedError = error);
+        Result<int> output = result.TapError(error => tappedError = error);
 
         Assert.NotNull(tappedError);
         Assert.Equal("Test error", tappedError.Message);
-        var error = output.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = output.Match(ok => (Error?)null, fail => fail.Error);
         Assert.Equal("Test error", error!.Message);
     }
 
     [Fact]
     public async Task TapAsync_WithTaskResult_ShouldExecuteAction()
     {
-        var resultTask = Task.FromResult(Result.Ok(42));
-        var tapped = 0;
+        Task<Result<int>> resultTask = Task.FromResult(Result.Ok(42));
+        int tapped = 0;
 
-        var output = await resultTask.TapAsync(value => tapped = value);
+        Result<int> output = await resultTask.TapAsync(value => tapped = value);
 
         Assert.Equal(42, tapped);
         Assert.Equal(42, output.Match(ok => ok.Value, fail => 0));
@@ -81,10 +81,10 @@ public class ResultTapTests
     [Fact]
     public async Task TapAsync_WithAsyncAction_ShouldExecuteAction()
     {
-        var result = Result.Ok(42);
-        var tapped = 0;
+        Result<int> result = Result.Ok(42);
+        int tapped = 0;
 
-        var output = await result.TapAsync(async value =>
+        Result<int> output = await result.TapAsync(async value =>
         {
             await Task.Delay(1);
             tapped = value;
@@ -97,9 +97,9 @@ public class ResultTapTests
     [Fact]
     public void Tap_InPipeline_ShouldNotBreakChain()
     {
-        var log = new List<string>();
+        List<string> log = new List<string>();
 
-        var result = Railway.Start(5)
+        Result<int> result = Railway.Start(5)
             .Tap(x => log.Add($"Initial: {x}"))
             .Map(x => x * 2)
             .Tap(x => log.Add($"After map: {x}"))
@@ -116,9 +116,9 @@ public class ResultTapTests
     [Fact]
     public void TapError_InPipeline_OnlyExecutesOnError()
     {
-        var errorLog = new List<string>();
+        List<string> errorLog = new List<string>();
 
-        var result = Railway.Start(5)
+        Result<int> result = Railway.Start(5)
             .TapError(e => errorLog.Add("Should not execute"))
             .Bind(x => Result.Fail<int>("Failure", "TEST"))
             .TapError(e => errorLog.Add($"Error: {e.Message}"))
@@ -133,57 +133,57 @@ public class ResultTapTests
     [Fact]
     public async Task TapErrorAsync_WithTaskResult_ShouldExecuteOnError()
     {
-        var errorMessage = "";
-        var resultTask = Task.FromResult(Result.Fail<int>("Failed", "ERR"));
+        string errorMessage = "";
+        Task<Result<int>> resultTask = Task.FromResult(Result.Fail<int>("Failed", "ERR"));
 
-        var output = await resultTask.TapErrorAsync(e => errorMessage = e.Message);
+        Result<int> output = await resultTask.TapErrorAsync(e => errorMessage = e.Message);
 
         Assert.Equal("Failed", errorMessage);
-        var error = output.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = output.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
     }
 
     [Fact]
     public async Task TapErrorAsync_WithAsyncAction_ShouldExecuteOnError()
     {
-        var errorMessage = "";
-        var result = Result.Fail<int>("Failed", "ERR");
+        string errorMessage = "";
+        Result<int> result = Result.Fail<int>("Failed", "ERR");
 
-        var output = await result.TapErrorAsync(async e =>
+        Result<int> output = await result.TapErrorAsync(async e =>
         {
             await Task.Delay(1);
             errorMessage = e.Message;
         });
 
         Assert.Equal("Failed", errorMessage);
-        var error = output.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = output.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
     }
 
     [Fact]
     public async Task TapErrorAsync_WithTaskResultAndAsyncAction_ShouldExecuteOnError()
     {
-        var errorMessage = "";
-        var resultTask = Task.FromResult(Result.Fail<int>("Failed", "ERR"));
+        string errorMessage = "";
+        Task<Result<int>> resultTask = Task.FromResult(Result.Fail<int>("Failed", "ERR"));
 
-        var output = await resultTask.TapErrorAsync(async e =>
+        Result<int> output = await resultTask.TapErrorAsync(async e =>
         {
             await Task.Delay(1);
             errorMessage = e.Message;
         });
 
         Assert.Equal("Failed", errorMessage);
-        var error = output.Match(ok => (Error?)null, fail => fail.Error);
+        Error? error = output.Match(ok => (Error?)null, fail => fail.Error);
         Assert.NotNull(error);
     }
 
     [Fact]
     public async Task TapAsync_WithTaskResultAndAsyncAction_ShouldExecute()
     {
-        var tapped = 0;
-        var resultTask = Task.FromResult(Result.Ok(42));
+        int tapped = 0;
+        Task<Result<int>> resultTask = Task.FromResult(Result.Ok(42));
 
-        var output = await resultTask.TapAsync(async value =>
+        Result<int> output = await resultTask.TapAsync(async value =>
         {
             await Task.Delay(1);
             tapped = value;

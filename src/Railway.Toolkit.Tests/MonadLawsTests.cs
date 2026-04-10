@@ -18,11 +18,11 @@ public class MonadLawsTests
     public void Bind_LeftIdentity_ShouldHold()
     {
         // Left Identity: Result.Ok(a).Bind(f) should equal f(a)
-        var value = 5;
+        int value = 5;
         Func<int, Result<int>> f = x => Result.Ok(x * 2);
 
-        var left = Result.Ok(value).Bind(f);
-        var right = f(value);
+        Result<int> left = Result.Ok(value).Bind(f);
+        Result<int> right = f(value);
 
         AssertResultsEqual(left, right);
     }
@@ -31,10 +31,10 @@ public class MonadLawsTests
     public void Bind_RightIdentity_ShouldHold()
     {
         // Right Identity: m.Bind(Result.Ok) should equal m
-        var m = Result.Ok(42);
+        Result<int> m = Result.Ok(42);
 
-        var left = m.Bind(x => Result.Ok(x));
-        var right = m;
+        Result<int> left = m.Bind(x => Result.Ok(x));
+        Result<int> right = m;
 
         AssertResultsEqual(left, right);
     }
@@ -43,12 +43,12 @@ public class MonadLawsTests
     public void Bind_Associativity_ShouldHold()
     {
         // Associativity: m.Bind(f).Bind(g) should equal m.Bind(x => f(x).Bind(g))
-        var m = Result.Ok(5);
+        Result<int> m = Result.Ok(5);
         Func<int, Result<int>> f = x => Result.Ok(x * 2);
         Func<int, Result<int>> g = x => Result.Ok(x + 3);
 
-        var left = m.Bind(f).Bind(g);
-        var right = m.Bind(x => f(x).Bind(g));
+        Result<int> left = m.Bind(f).Bind(g);
+        Result<int> right = m.Bind(x => f(x).Bind(g));
 
         AssertResultsEqual(left, right);
     }
@@ -57,11 +57,11 @@ public class MonadLawsTests
     public void Bind_LeftIdentityWithFail_ShouldHold()
     {
         // Left identity should also hold when f returns Fail
-        var value = 5;
+        int value = 5;
         Func<int, Result<int>> f = x => Result.Fail<int>("Error", "TEST");
 
-        var left = Result.Ok(value).Bind(f);
-        var right = f(value);
+        Result<int> left = Result.Ok(value).Bind(f);
+        Result<int> right = f(value);
 
         AssertResultsEqual(left, right);
     }
@@ -70,10 +70,10 @@ public class MonadLawsTests
     public void Bind_RightIdentityWithFail_ShouldHold()
     {
         // Right identity should hold even for Fail
-        var m = Result.Fail<int>("Error", "TEST");
+        Result<int> m = Result.Fail<int>("Error", "TEST");
 
-        var left = m.Bind(x => Result.Ok(x));
-        var right = m;
+        Result<int> left = m.Bind(x => Result.Ok(x));
+        Result<int> right = m;
 
         AssertResultsEqual(left, right);
     }
@@ -82,12 +82,12 @@ public class MonadLawsTests
     public void Bind_AssociativityWithFail_ShouldHold()
     {
         // Associativity should hold when operations fail
-        var m = Result.Ok(5);
+        Result<int> m = Result.Ok(5);
         Func<int, Result<int>> f = x => Result.Fail<int>("f failed", "F");
         Func<int, Result<int>> g = x => Result.Ok(x + 3);
 
-        var left = m.Bind(f).Bind(g);
-        var right = m.Bind(x => f(x).Bind(g));
+        Result<int> left = m.Bind(f).Bind(g);
+        Result<int> right = m.Bind(x => f(x).Bind(g));
 
         AssertResultsEqual(left, right);
     }
@@ -100,10 +100,10 @@ public class MonadLawsTests
     public void Map_Identity_ShouldHold()
     {
         // Identity: m.Map(x => x) should equal m
-        var m = Result.Ok(42);
+        Result<int> m = Result.Ok(42);
 
-        var left = m.Map(x => x);
-        var right = m;
+        Result<int> left = m.Map(x => x);
+        Result<int> right = m;
 
         AssertResultsEqual(left, right);
     }
@@ -112,12 +112,12 @@ public class MonadLawsTests
     public void Map_Composition_ShouldHold()
     {
         // Composition: m.Map(f).Map(g) should equal m.Map(x => g(f(x)))
-        var m = Result.Ok(5);
+        Result<int> m = Result.Ok(5);
         Func<int, int> f = x => x * 2;
         Func<int, int> g = x => x + 3;
 
-        var left = m.Map(f).Map(g);
-        var right = m.Map(x => g(f(x)));
+        Result<int> left = m.Map(f).Map(g);
+        Result<int> right = m.Map(x => g(f(x)));
 
         AssertResultsEqual(left, right);
     }
@@ -125,10 +125,10 @@ public class MonadLawsTests
     [Fact]
     public void Map_IdentityWithFail_ShouldHold()
     {
-        var m = Result.Fail<int>("Error", "TEST");
+        Result<int> m = Result.Fail<int>("Error", "TEST");
 
-        var left = m.Map(x => x);
-        var right = m;
+        Result<int> left = m.Map(x => x);
+        Result<int> right = m;
 
         AssertResultsEqual(left, right);
     }
@@ -136,12 +136,12 @@ public class MonadLawsTests
     [Fact]
     public void Map_CompositionWithFail_ShouldHold()
     {
-        var m = Result.Fail<int>("Error", "TEST");
+        Result<int> m = Result.Fail<int>("Error", "TEST");
         Func<int, int> f = x => x * 2;
         Func<int, int> g = x => x + 3;
 
-        var left = m.Map(f).Map(g);
-        var right = m.Map(x => g(f(x)));
+        Result<int> left = m.Map(f).Map(g);
+        Result<int> right = m.Map(x => g(f(x)));
 
         AssertResultsEqual(left, right);
     }
@@ -152,11 +152,11 @@ public class MonadLawsTests
     [Fact]
     public void Map_ShouldBeBindWithOk()
     {
-        var m = Result.Ok(5);
+        Result<int> m = Result.Ok(5);
         Func<int, int> f = x => x * 2;
 
-        var usingMap = m.Map(f);
-        var usingBind = m.Bind(x => Result.Ok(f(x)));
+        Result<int> usingMap = m.Map(f);
+        Result<int> usingBind = m.Bind(x => Result.Ok(f(x)));
 
         AssertResultsEqual(usingMap, usingBind);
     }
@@ -164,11 +164,11 @@ public class MonadLawsTests
     [Fact]
     public void Map_ShouldBeBindWithOk_EvenForFail()
     {
-        var m = Result.Fail<int>("Error", "TEST");
+        Result<int> m = Result.Fail<int>("Error", "TEST");
         Func<int, int> f = x => x * 2;
 
-        var usingMap = m.Map(f);
-        var usingBind = m.Bind(x => Result.Ok(f(x)));
+        Result<int> usingMap = m.Map(f);
+        Result<int> usingBind = m.Bind(x => Result.Ok(f(x)));
 
         AssertResultsEqual(usingMap, usingBind);
     }
@@ -176,12 +176,12 @@ public class MonadLawsTests
     // Helper to assert two results are equal
     private static void AssertResultsEqual<T>(Result<T> left, Result<T> right)
     {
-        var leftValue = left.Match(
+        (bool, T?, Error?) leftValue = left.Match(
             ok => (true, ok.Value, (Error?)null),
             fail => (false, default(T), fail.Error)
         );
 
-        var rightValue = right.Match(
+        (bool, T?, Error?) rightValue = right.Match(
             ok => (true, ok.Value, (Error?)null),
             fail => (false, default(T), fail.Error)
         );
