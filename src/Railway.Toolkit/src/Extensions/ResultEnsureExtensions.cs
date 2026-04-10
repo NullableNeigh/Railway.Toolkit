@@ -24,10 +24,32 @@ public static class ResultEnsureExtensions
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
-        return result.Match<Result<T>>(
-            ok => predicate(ok.Value) ? ok.Value : error,
-            fail => fail.Error
-        );
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        {
+            Result<T> output = result.Match<Result<T>>(
+                ok =>
+                {
+                    bool isValid = predicate(ok.Value);
+                    if (isValid)
+                    {
+                        RailwayLogging.Logger?.LogOperation("Ensure", "passed (stayed on success track)", timer.Elapsed);
+                        return ok.Value;
+                    }
+                    else
+                    {
+                        RailwayLogging.Logger?.LogOperation("Ensure", "failed (switched to failure track)", timer.Elapsed, error);
+                        return error;
+                    }
+                },
+                fail =>
+                {
+                    RailwayLogging.Logger?.LogOperation("Ensure", "skipped (on failure track)", timer.Elapsed);
+                    return fail.Error;
+                }
+            );
+
+            return output;
+        }
     }
 
     /// <summary>
@@ -111,14 +133,32 @@ public static class ResultEnsureExtensions
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
-        return await result.Match<Task<Result<T>>>(
-            async ok =>
-            {
-                bool isValid = await predicate(ok.Value).ConfigureAwait(false);
-                return isValid ? ok.Value : error;
-            },
-            fail => Task.FromResult<Result<T>>(fail.Error)
-        ).ConfigureAwait(false);
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        {
+            Result<T> output = await result.Match<Task<Result<T>>>(
+                async ok =>
+                {
+                    bool isValid = await predicate(ok.Value).ConfigureAwait(false);
+                    if (isValid)
+                    {
+                        RailwayLogging.Logger?.LogOperation("EnsureAsync", "passed (stayed on success track)", timer.Elapsed);
+                        return ok.Value;
+                    }
+                    else
+                    {
+                        RailwayLogging.Logger?.LogOperation("EnsureAsync", "failed (switched to failure track)", timer.Elapsed, error);
+                        return error;
+                    }
+                },
+                fail =>
+                {
+                    RailwayLogging.Logger?.LogOperation("EnsureAsync", "skipped (on failure track)", timer.Elapsed);
+                    return Task.FromResult<Result<T>>(fail.Error);
+                }
+            ).ConfigureAwait(false);
+
+            return output;
+        }
     }
 
     /// <summary>

@@ -19,13 +19,20 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(func);
 
-        try
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            return func();
-        }
-        catch (Exception ex)
-        {
-            return Error.FromException(ex, errorCode);
+            try
+            {
+                T result = func();
+                RailwayLogging.Logger?.LogOperation("Try", "succeeded", timer.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Error error = Error.FromException(ex, errorCode);
+                RailwayLogging.Logger?.LogOperation("Try", "caught exception", timer.Elapsed, error);
+                return error;
+            }
         }
     }
 
@@ -42,14 +49,20 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(func);
 
-        try
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            T? result = await func().ConfigureAwait(false);
-            return result;
-        }
-        catch (Exception ex)
-        {
-            return Error.FromException(ex, errorCode);
+            try
+            {
+                T result = await func().ConfigureAwait(false);
+                RailwayLogging.Logger?.LogOperation("TryAsync", "succeeded", timer.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Error error = Error.FromException(ex, errorCode);
+                RailwayLogging.Logger?.LogOperation("TryAsync", "caught exception", timer.Elapsed, error);
+                return error;
+            }
         }
     }
 
@@ -65,14 +78,20 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        try
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            action();
-            return Unit.Value;
-        }
-        catch (Exception ex)
-        {
-            return Error.FromException(ex, errorCode);
+            try
+            {
+                action();
+                RailwayLogging.Logger?.LogOperation("Try", "succeeded", timer.Elapsed);
+                return Unit.Value;
+            }
+            catch (Exception ex)
+            {
+                Error error = Error.FromException(ex, errorCode);
+                RailwayLogging.Logger?.LogOperation("Try", "caught exception", timer.Elapsed, error);
+                return error;
+            }
         }
     }
 

@@ -22,10 +22,29 @@ public static class ResultBindExtensions
     {
         ArgumentNullException.ThrowIfNull(binder);
 
-        return result.Match<Result<TOut>>(
-            ok => binder(ok.Value),
-            fail => fail.Error
-        );
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        {
+            Result<TOut> output = result.Match<Result<TOut>>(
+                ok =>
+                {
+                    Result<TOut> bound = binder(ok.Value);
+
+                    bound.Match(
+                        okBound => RailwayLogging.Logger?.LogOperation("Bind", "executed (stayed on success track)", timer.Elapsed),
+                        failBound => RailwayLogging.Logger?.LogOperation("Bind", "failed (switched to failure track)", timer.Elapsed, failBound.Error)
+                    );
+
+                    return bound;
+                },
+                fail =>
+                {
+                    RailwayLogging.Logger?.LogOperation("Bind", "skipped (on failure track)", timer.Elapsed);
+                    return fail.Error;
+                }
+            );
+
+            return output;
+        }
     }
 
     /// <summary>
@@ -43,7 +62,7 @@ public static class ResultBindExtensions
         ArgumentNullException.ThrowIfNull(binder);
 
         Result<TIn> result = await resultTask.ConfigureAwait(false);
-        return result.Bind(binder);
+        return result.Bind(binder); // Logging happens in Bind
     }
 
     /// <summary>
@@ -60,10 +79,29 @@ public static class ResultBindExtensions
     {
         ArgumentNullException.ThrowIfNull(binder);
 
-        return await result.Match<Task<Result<TOut>>>(
-            async ok => await binder(ok.Value).ConfigureAwait(false),
-            fail => Task.FromResult<Result<TOut>>(fail.Error)
-        ).ConfigureAwait(false);
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        {
+            Result<TOut> output = await result.Match<Task<Result<TOut>>>(
+                async ok =>
+                {
+                    Result<TOut> bound = await binder(ok.Value).ConfigureAwait(false);
+
+                    bound.Match(
+                        okBound => RailwayLogging.Logger?.LogOperation("BindAsync", "executed (stayed on success track)", timer.Elapsed),
+                        failBound => RailwayLogging.Logger?.LogOperation("BindAsync", "failed (switched to failure track)", timer.Elapsed, failBound.Error)
+                    );
+
+                    return bound;
+                },
+                fail =>
+                {
+                    RailwayLogging.Logger?.LogOperation("BindAsync", "skipped (on failure track)", timer.Elapsed);
+                    return Task.FromResult<Result<TOut>>(fail.Error);
+                }
+            ).ConfigureAwait(false);
+
+            return output;
+        }
     }
 
     /// <summary>
@@ -81,6 +119,6 @@ public static class ResultBindExtensions
         ArgumentNullException.ThrowIfNull(binder);
 
         Result<TIn> result = await resultTask.ConfigureAwait(false);
-        return await result.BindAsync(binder).ConfigureAwait(false);
+        return await result.BindAsync(binder).ConfigureAwait(false); // Logging happens in BindAsync
     }
 }
