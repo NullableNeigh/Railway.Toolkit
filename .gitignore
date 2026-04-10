@@ -419,3 +419,4 @@ FodyWeavers.xsd
 
 # Claude Code
 .claude/
+!.claude/claude.md
