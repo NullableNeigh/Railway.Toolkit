@@ -216,17 +216,31 @@ public static class ResultEnsureExtensions
     {
         ArgumentNullException.ThrowIfNull(validations);
 
-        Result<T> currentResult = result;
-        foreach ((Func<T, bool>? predicate, Error? error) in validations)
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            currentResult = currentResult.Ensure(predicate, error);
-            // Short-circuit if we've already failed
-            if (currentResult.Match(_ => false, _ => true))
-            {
-                break;
-            }
-        }
+            Result<T> currentResult = result;
+            int validationCount = 0;
 
-        return currentResult;
+            foreach ((Func<T, bool>? predicate, Error? error) in validations)
+            {
+                currentResult = currentResult.Ensure(predicate, error); // Ensure already logs
+                validationCount++;
+
+                // Short-circuit if we've already failed
+                if (currentResult.Match(_ => false, _ => true))
+                {
+                    break;
+                }
+            }
+
+            bool allPassed = currentResult.Match(_ => true, _ => false);
+            string status = allPassed
+                ? $"all {validationCount} validation(s) passed"
+                : $"failed at validation {validationCount}";
+
+            RailwayLogging.Logger?.LogOperation("EnsureAll", status, timer.Elapsed);
+
+            return currentResult;
+        }
     }
 }

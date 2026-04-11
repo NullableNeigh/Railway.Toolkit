@@ -22,26 +22,34 @@ public static class ResultCollectionExtensions
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
-        List<TOut> results = new List<TOut>();
-
-        foreach (TIn? item in source)
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            Result<TOut> result = selector(item);
+            List<TOut> results = new List<TOut>();
+            int processedCount = 0;
 
-            (bool isOk, TOut? value, Error? error) matched = result.Match<(bool isOk, TOut? value, Error? error)>(
-                ok => (true, ok.Value, null),
-                fail => (false, default, fail.Error)
-            );
-
-            if (!matched.isOk)
+            foreach (TIn? item in source)
             {
-                return matched.error!;
+                Result<TOut> result = selector(item);
+
+                (bool isOk, TOut? value, Error? error) matched = result.Match<(bool isOk, TOut? value, Error? error)>(
+                    ok => (true, ok.Value, null),
+                    fail => (false, default, fail.Error)
+                );
+
+                processedCount++;
+
+                if (!matched.isOk)
+                {
+                    RailwayLogging.Logger?.LogOperation("Traverse", $"failed at element {processedCount}", timer.Elapsed, matched.error);
+                    return matched.error!;
+                }
+
+                results.Add(matched.value!);
             }
 
-            results.Add(matched.value!);
+            RailwayLogging.Logger?.LogOperation("Traverse", $"all {processedCount} element(s) succeeded", timer.Elapsed);
+            return results;
         }
-
-        return results;
     }
 
     /// <summary>
@@ -60,25 +68,31 @@ public static class ResultCollectionExtensions
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
-        List<TOut> results = new List<TOut>();
-        List<Error> errors = new List<Error>();
-
-        foreach (TIn? item in source)
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            Result<TOut> result = selector(item);
+            List<TOut> results = new List<TOut>();
+            List<Error> errors = new List<Error>();
 
-            result.Match(
-                ok => results.Add(ok.Value),
-                fail => errors.Add(fail.Error)
-            );
+            foreach (TIn? item in source)
+            {
+                Result<TOut> result = selector(item);
+
+                result.Match(
+                    ok => results.Add(ok.Value),
+                    fail => errors.Add(fail.Error)
+                );
+            }
+
+            if (errors.Count > 0)
+            {
+                Error aggregateError = Error.Aggregate(errors); // Error.Aggregate already logs
+                RailwayLogging.Logger?.LogOperation("TraverseAll", $"failed with {errors.Count} error(s)", timer.Elapsed, aggregateError);
+                return aggregateError;
+            }
+
+            RailwayLogging.Logger?.LogOperation("TraverseAll", $"all {results.Count} element(s) succeeded", timer.Elapsed);
+            return results;
         }
-
-        if (errors.Count > 0)
-        {
-            return Error.Aggregate(errors);
-        }
-
-        return results;
     }
 
     /// <summary>

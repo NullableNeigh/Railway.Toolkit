@@ -19,13 +19,30 @@ public static class ResultCombineExtensions
         this Result<T1> first,
         Result<T2> second)
     {
-        return first.Match<Result<(T1, T2)>>(
-            ok1 => second.Match<Result<(T1, T2)>>(
-                ok2 => (ok1.Value, ok2.Value),
-                fail2 => fail2.Error
-            ),
-            fail1 => fail1.Error
-        );
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        {
+            Result<(T1, T2)> output = first.Match<Result<(T1, T2)>>(
+                ok1 => second.Match<Result<(T1, T2)>>(
+                    ok2 =>
+                    {
+                        RailwayLogging.Logger?.LogOperation("Zip", "both results succeeded", timer.Elapsed);
+                        return (ok1.Value, ok2.Value);
+                    },
+                    fail2 =>
+                    {
+                        RailwayLogging.Logger?.LogOperation("Zip", "second result failed", timer.Elapsed, fail2.Error);
+                        return fail2.Error;
+                    }
+                ),
+                fail1 =>
+                {
+                    RailwayLogging.Logger?.LogOperation("Zip", "first result failed", timer.Elapsed, fail1.Error);
+                    return fail1.Error;
+                }
+            );
+
+            return output;
+        }
     }
 
     /// <summary>
@@ -119,24 +136,32 @@ public static class ResultCombineExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
-        List<T> values = new List<T>();
-
-        foreach (Result<T> result in results)
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
-                ok => (true, ok.Value, null),
-                fail => (false, default, fail.Error)
-            );
+            List<T> values = new List<T>();
+            int processedCount = 0;
 
-            if (!matched.isOk)
+            foreach (Result<T> result in results)
             {
-                return matched.error!;
+                (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
+                    ok => (true, ok.Value, null),
+                    fail => (false, default, fail.Error)
+                );
+
+                processedCount++;
+
+                if (!matched.isOk)
+                {
+                    RailwayLogging.Logger?.LogOperation("Combine", $"failed at result {processedCount}/{results.Length}", timer.Elapsed, matched.error);
+                    return matched.error!;
+                }
+
+                values.Add(matched.value!);
             }
 
-            values.Add(matched.value!);
+            RailwayLogging.Logger?.LogOperation("Combine", $"all {results.Length} result(s) succeeded", timer.Elapsed);
+            return values;
         }
-
-        return values;
     }
 
     /// <summary>
@@ -147,24 +172,32 @@ public static class ResultCombineExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
-        List<T> values = new List<T>();
-
-        foreach (Result<T> result in results)
+        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
-                ok => (true, ok.Value, null),
-                fail => (false, default, fail.Error)
-            );
+            List<T> values = new List<T>();
+            int processedCount = 0;
 
-            if (!matched.isOk)
+            foreach (Result<T> result in results)
             {
-                return matched.error!;
+                (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
+                    ok => (true, ok.Value, null),
+                    fail => (false, default, fail.Error)
+                );
+
+                processedCount++;
+
+                if (!matched.isOk)
+                {
+                    RailwayLogging.Logger?.LogOperation("Combine", $"failed at result {processedCount}", timer.Elapsed, matched.error);
+                    return matched.error!;
+                }
+
+                values.Add(matched.value!);
             }
 
-            values.Add(matched.value!);
+            RailwayLogging.Logger?.LogOperation("Combine", $"all {processedCount} result(s) succeeded", timer.Elapsed);
+            return values;
         }
-
-        return values;
     }
 
     /// <summary>
