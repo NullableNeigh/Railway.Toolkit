@@ -77,10 +77,15 @@ public static class ResultCollectionExtensions
             {
                 Result<TOut> result = selector(item);
 
-                result.Match(
-                    ok => results.Add(ok.Value),
-                    fail => errors.Add(fail.Error)
-                );
+                if (result is Result<TOut>.Ok ok)
+                {
+                    results.Add(ok.Value);
+                }
+                else
+                {
+                    Result<TOut>.Fail fail = (Result<TOut>.Fail)result;
+                    errors.Add(fail.Error);
+                }
             }
 
             if (errors.Count > 0)
@@ -156,10 +161,15 @@ public static class ResultCollectionExtensions
         {
             Result<TOut> result = await selector(item).ConfigureAwait(false);
 
-            result.Match(
-                ok => results.Add(ok.Value),
-                fail => errors.Add(fail.Error)
-            );
+            if (result is Result<TOut>.Ok ok)
+            {
+                results.Add(ok.Value);
+            }
+            else
+            {
+                Result<TOut>.Fail fail = (Result<TOut>.Fail)result;
+                errors.Add(fail.Error);
+            }
         }
 
         if (errors.Count > 0)
@@ -217,10 +227,15 @@ public static class ResultCollectionExtensions
 
         foreach (Result<T> result in results)
         {
-            result.Match(
-                ok => values.Add(ok.Value),
-                fail => errors.Add(fail.Error)
-            );
+            if (result is Result<T>.Ok ok)
+            {
+                values.Add(ok.Value);
+            }
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                errors.Add(fail.Error);
+            }
         }
 
         if (errors.Count > 0)
@@ -284,10 +299,15 @@ public static class ResultCollectionExtensions
         {
             Result<T> result = await resultTask.ConfigureAwait(false);
 
-            result.Match(
-                ok => values.Add(ok.Value),
-                fail => errors.Add(fail.Error)
-            );
+            if (result is Result<T>.Ok ok)
+            {
+                values.Add(ok.Value);
+            }
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                errors.Add(fail.Error);
+            }
         }
 
         if (errors.Count > 0)
@@ -314,10 +334,15 @@ public static class ResultCollectionExtensions
 
         foreach (Result<T> result in results)
         {
-            result.Match(
-                ok => successes.Add(ok.Value),
-                fail => failures.Add(fail.Error)
-            );
+            if (result is Result<T>.Ok ok)
+            {
+                successes.Add(ok.Value);
+            }
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                failures.Add(fail.Error);
+            }
         }
 
         return (successes, failures);
@@ -337,10 +362,10 @@ public static class ResultCollectionExtensions
 
         foreach (Result<T> result in results)
         {
-            result.MatchOk(
-                ok => values.Add(ok.Value),
-                () => { }
-            );
+            if (result is Result<T>.Ok ok)
+            {
+                values.Add(ok.Value);
+            }
         }
 
         return values;

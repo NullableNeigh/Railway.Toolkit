@@ -23,19 +23,20 @@ public static class ResultErrorExtensions
 
         using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
-                {
-                    RailwayLogging.Logger?.LogOperation("MapError", "skipped (on success track)", timer.Elapsed);
-                    return ok.Value;
-                },
-                fail =>
-                {
-                    Error mappedError = mapper(fail.Error);
-                    RailwayLogging.Logger?.LogOperation("MapError", "executed", timer.Elapsed, mappedError);
-                    return mappedError;
-                }
-            );
+            Result<T> output;
+
+            if (result is Result<T>.Ok ok)
+            {
+                RailwayLogging.Logger?.LogOperation("MapError", "skipped (on success track)", timer.Elapsed);
+                output = new Result<T>.Ok(ok.Value);
+            }
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                Error mappedError = mapper(fail.Error);
+                RailwayLogging.Logger?.LogOperation("MapError", "executed", timer.Elapsed, mappedError);
+                output = new Result<T>.Fail(mappedError);
+            }
 
             return output;
         }
@@ -73,19 +74,20 @@ public static class ResultErrorExtensions
 
         using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            Result<T> output = await result.Match<Task<Result<T>>>(
-                ok =>
-                {
-                    RailwayLogging.Logger?.LogOperation("MapErrorAsync", "skipped (on success track)", timer.Elapsed);
-                    return Task.FromResult<Result<T>>(ok.Value);
-                },
-                async fail =>
-                {
-                    Error mappedError = await mapper(fail.Error).ConfigureAwait(false);
-                    RailwayLogging.Logger?.LogOperation("MapErrorAsync", "executed", timer.Elapsed, mappedError);
-                    return mappedError;
-                }
-            ).ConfigureAwait(false);
+            Result<T> output;
+
+            if (result is Result<T>.Ok ok)
+            {
+                RailwayLogging.Logger?.LogOperation("MapErrorAsync", "skipped (on success track)", timer.Elapsed);
+                output = new Result<T>.Ok(ok.Value);
+            }
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                Error mappedError = await mapper(fail.Error).ConfigureAwait(false);
+                RailwayLogging.Logger?.LogOperation("MapErrorAsync", "executed", timer.Elapsed, mappedError);
+                output = new Result<T>.Fail(mappedError);
+            }
 
             return output;
         }
@@ -122,18 +124,18 @@ public static class ResultErrorExtensions
     {
         using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
-                {
-                    RailwayLogging.Logger?.LogOperation("OrElse", "skipped (on success track)", timer.Elapsed);
-                    return ok.Value;
-                },
-                fail =>
-                {
-                    RailwayLogging.Logger?.LogOperation("OrElse", "switched to success track", timer.Elapsed);
-                    return defaultValue;
-                }
-            );
+            Result<T> output;
+
+            if (result is Result<T>.Ok ok)
+            {
+                RailwayLogging.Logger?.LogOperation("OrElse", "skipped (on success track)", timer.Elapsed);
+                output = new Result<T>.Ok(ok.Value);
+            }
+            else
+            {
+                RailwayLogging.Logger?.LogOperation("OrElse", "switched to success track", timer.Elapsed);
+                output = new Result<T>.Ok(defaultValue);
+            }
 
             return output;
         }
@@ -154,18 +156,19 @@ public static class ResultErrorExtensions
 
         using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
-                {
-                    RailwayLogging.Logger?.LogOperation("OrElse", "skipped (on success track)", timer.Elapsed);
-                    return ok.Value;
-                },
-                fail =>
-                {
-                    RailwayLogging.Logger?.LogOperation("OrElse", "switched to success track", timer.Elapsed);
-                    return defaultValueFactory(fail.Error);
-                }
-            );
+            Result<T> output;
+
+            if (result is Result<T>.Ok ok)
+            {
+                RailwayLogging.Logger?.LogOperation("OrElse", "skipped (on success track)", timer.Elapsed);
+                output = new Result<T>.Ok(ok.Value);
+            }
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                RailwayLogging.Logger?.LogOperation("OrElse", "switched to success track", timer.Elapsed);
+                output = new Result<T>.Ok(defaultValueFactory(fail.Error));
+            }
 
             return output;
         }
@@ -185,21 +188,27 @@ public static class ResultErrorExtensions
     {
         using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
+            Result<T> output;
+
+            if (result is Result<T>.Ok ok)
+            {
+                RailwayLogging.Logger?.LogOperation("OrElseWith", "skipped (on success track)", timer.Elapsed);
+                output = new Result<T>.Ok(ok.Value);
+            }
+            else
+            {
+                if (alternative is Result<T>.Ok)
                 {
-                    RailwayLogging.Logger?.LogOperation("OrElseWith", "skipped (on success track)", timer.Elapsed);
-                    return ok.Value;
-                },
-                fail =>
-                {
-                    alternative.Match(
-                        okAlt => RailwayLogging.Logger?.LogOperation("OrElseWith", "switched to success track", timer.Elapsed),
-                        failAlt => RailwayLogging.Logger?.LogOperation("OrElseWith", "executed (stayed on failure track)", timer.Elapsed, failAlt.Error)
-                    );
-                    return alternative;
+                    RailwayLogging.Logger?.LogOperation("OrElseWith", "switched to success track", timer.Elapsed);
                 }
-            );
+                else
+                {
+                    Result<T>.Fail failAlt = (Result<T>.Fail)alternative;
+                    RailwayLogging.Logger?.LogOperation("OrElseWith", "executed (stayed on failure track)", timer.Elapsed, failAlt.Error);
+                }
+
+                output = alternative;
+            }
 
             return output;
         }
@@ -220,22 +229,30 @@ public static class ResultErrorExtensions
 
         using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
+            Result<T> output;
+
+            if (result is Result<T>.Ok ok)
+            {
+                RailwayLogging.Logger?.LogOperation("OrElseWith", "skipped (on success track)", timer.Elapsed);
+                output = new Result<T>.Ok(ok.Value);
+            }
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                Result<T> alternative = alternativeFactory(fail.Error);
+
+                if (alternative is Result<T>.Ok)
                 {
-                    RailwayLogging.Logger?.LogOperation("OrElseWith", "skipped (on success track)", timer.Elapsed);
-                    return ok.Value;
-                },
-                fail =>
-                {
-                    Result<T> alternative = alternativeFactory(fail.Error);
-                    alternative.Match(
-                        okAlt => RailwayLogging.Logger?.LogOperation("OrElseWith", "switched to success track", timer.Elapsed),
-                        failAlt => RailwayLogging.Logger?.LogOperation("OrElseWith", "executed (stayed on failure track)", timer.Elapsed, failAlt.Error)
-                    );
-                    return alternative;
+                    RailwayLogging.Logger?.LogOperation("OrElseWith", "switched to success track", timer.Elapsed);
                 }
-            );
+                else
+                {
+                    Result<T>.Fail failAlt = (Result<T>.Fail)alternative;
+                    RailwayLogging.Logger?.LogOperation("OrElseWith", "executed (stayed on failure track)", timer.Elapsed, failAlt.Error);
+                }
+
+                output = alternative;
+            }
 
             return output;
         }

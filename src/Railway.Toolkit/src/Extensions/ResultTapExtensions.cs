@@ -23,14 +23,15 @@ public static class ResultTapExtensions
 
         using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            result.MatchOk(
-                ok =>
-                {
-                    action(ok.Value);
-                    RailwayLogging.Logger?.LogOperation("Tap", "executed", timer.Elapsed);
-                },
-                () => RailwayLogging.Logger?.LogOperation("Tap", "skipped (on failure track)", timer.Elapsed)
-            );
+            if (result is Result<T>.Ok ok)
+            {
+                action(ok.Value);
+                RailwayLogging.Logger?.LogOperation("Tap", "executed", timer.Elapsed);
+            }
+            else
+            {
+                RailwayLogging.Logger?.LogOperation("Tap", "skipped (on failure track)", timer.Elapsed);
+            }
 
             return result;
         }
@@ -53,14 +54,15 @@ public static class ResultTapExtensions
 
         using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            result.MatchFail(
-                fail =>
-                {
-                    action(fail.Error);
-                    RailwayLogging.Logger?.LogOperation("TapError", "executed", timer.Elapsed, fail.Error);
-                },
-                () => RailwayLogging.Logger?.LogOperation("TapError", "skipped (on success track)", timer.Elapsed)
-            );
+            if (result is Result<T>.Fail fail)
+            {
+                action(fail.Error);
+                RailwayLogging.Logger?.LogOperation("TapError", "executed", timer.Elapsed, fail.Error);
+            }
+            else
+            {
+                RailwayLogging.Logger?.LogOperation("TapError", "skipped (on success track)", timer.Elapsed);
+            }
 
             return result;
         }
@@ -96,10 +98,10 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        await result.MatchOk(
-            async ok => await action(ok.Value).ConfigureAwait(false),
-            () => Task.CompletedTask
-        ).ConfigureAwait(false);
+        if (result is Result<T>.Ok ok)
+        {
+            await action(ok.Value).ConfigureAwait(false);
+        }
 
         return result;
     }
@@ -151,10 +153,10 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        await result.MatchFail(
-            async fail => await action(fail.Error).ConfigureAwait(false),
-            () => Task.CompletedTask
-        ).ConfigureAwait(false);
+        if (result is Result<T>.Fail fail)
+        {
+            await action(fail.Error).ConfigureAwait(false);
+        }
 
         return result;
     }

@@ -26,27 +26,27 @@ public static class ResultEnsureExtensions
 
         using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
+            Result<T> output;
+
+            if (result is Result<T>.Ok ok)
+            {
+                if (predicate(ok.Value))
                 {
-                    bool isValid = predicate(ok.Value);
-                    if (isValid)
-                    {
-                        RailwayLogging.Logger?.LogOperation("Ensure", "passed (stayed on success track)", timer.Elapsed);
-                        return ok.Value;
-                    }
-                    else
-                    {
-                        RailwayLogging.Logger?.LogOperation("Ensure", "failed (switched to failure track)", timer.Elapsed, error);
-                        return error;
-                    }
-                },
-                fail =>
-                {
-                    RailwayLogging.Logger?.LogOperation("Ensure", "skipped (on failure track)", timer.Elapsed);
-                    return fail.Error;
+                    RailwayLogging.Logger?.LogOperation("Ensure", "passed (stayed on success track)", timer.Elapsed);
+                    output = new Result<T>.Ok(ok.Value);
                 }
-            );
+                else
+                {
+                    RailwayLogging.Logger?.LogOperation("Ensure", "failed (switched to failure track)", timer.Elapsed, error);
+                    output = new Result<T>.Fail(error);
+                }
+            }
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                RailwayLogging.Logger?.LogOperation("Ensure", "skipped (on failure track)", timer.Elapsed);
+                output = new Result<T>.Fail(fail.Error);
+            }
 
             return output;
         }
@@ -69,10 +69,15 @@ public static class ResultEnsureExtensions
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(errorFactory);
 
-        return result.Match<Result<T>>(
-            ok => predicate(ok.Value) ? ok.Value : errorFactory(ok.Value),
-            fail => fail.Error
-        );
+        if (result is Result<T>.Ok ok)
+        {
+            return predicate(ok.Value)
+                ? new Result<T>.Ok(ok.Value)
+                : new Result<T>.Fail(errorFactory(ok.Value));
+        }
+
+        Result<T>.Fail fail = (Result<T>.Fail)result;
+        return new Result<T>.Fail(fail.Error);
     }
 
     /// <summary>
@@ -135,27 +140,27 @@ public static class ResultEnsureExtensions
 
         using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            Result<T> output = await result.Match<Task<Result<T>>>(
-                async ok =>
+            Result<T> output;
+
+            if (result is Result<T>.Ok ok)
+            {
+                if (await predicate(ok.Value).ConfigureAwait(false))
                 {
-                    bool isValid = await predicate(ok.Value).ConfigureAwait(false);
-                    if (isValid)
-                    {
-                        RailwayLogging.Logger?.LogOperation("EnsureAsync", "passed (stayed on success track)", timer.Elapsed);
-                        return ok.Value;
-                    }
-                    else
-                    {
-                        RailwayLogging.Logger?.LogOperation("EnsureAsync", "failed (switched to failure track)", timer.Elapsed, error);
-                        return error;
-                    }
-                },
-                fail =>
-                {
-                    RailwayLogging.Logger?.LogOperation("EnsureAsync", "skipped (on failure track)", timer.Elapsed);
-                    return Task.FromResult<Result<T>>(fail.Error);
+                    RailwayLogging.Logger?.LogOperation("EnsureAsync", "passed (stayed on success track)", timer.Elapsed);
+                    output = new Result<T>.Ok(ok.Value);
                 }
-            ).ConfigureAwait(false);
+                else
+                {
+                    RailwayLogging.Logger?.LogOperation("EnsureAsync", "failed (switched to failure track)", timer.Elapsed, error);
+                    output = new Result<T>.Fail(error);
+                }
+            }
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                RailwayLogging.Logger?.LogOperation("EnsureAsync", "skipped (on failure track)", timer.Elapsed);
+                output = new Result<T>.Fail(fail.Error);
+            }
 
             return output;
         }
@@ -223,17 +228,16 @@ public static class ResultEnsureExtensions
 
             foreach ((Func<T, bool>? predicate, Error? error) in validations)
             {
-                currentResult = currentResult.Ensure(predicate, error); // Ensure already logs
+                currentResult = currentResult.Ensure(predicate, error);
                 validationCount++;
 
-                // Short-circuit if we've already failed
-                if (currentResult.Match(_ => false, _ => true))
+                if (currentResult is Result<T>.Fail)
                 {
                     break;
                 }
             }
 
-            bool allPassed = currentResult.Match(_ => true, _ => false);
+            bool allPassed = currentResult is Result<T>.Ok;
             string status = allPassed
                 ? $"all {validationCount} validation(s) passed"
                 : $"failed at validation {validationCount}";

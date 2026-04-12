@@ -21,25 +21,28 @@ public static class ResultCombineExtensions
     {
         using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
         {
-            Result<(T1, T2)> output = first.Match<Result<(T1, T2)>>(
-                ok1 => second.Match<Result<(T1, T2)>>(
-                    ok2 =>
-                    {
-                        RailwayLogging.Logger?.LogOperation("Zip", "both results succeeded", timer.Elapsed);
-                        return (ok1.Value, ok2.Value);
-                    },
-                    fail2 =>
-                    {
-                        RailwayLogging.Logger?.LogOperation("Zip", "second result failed", timer.Elapsed, fail2.Error);
-                        return fail2.Error;
-                    }
-                ),
-                fail1 =>
+            Result<(T1, T2)> output;
+
+            if (first is Result<T1>.Ok ok1)
+            {
+                if (second is Result<T2>.Ok ok2)
                 {
-                    RailwayLogging.Logger?.LogOperation("Zip", "first result failed", timer.Elapsed, fail1.Error);
-                    return fail1.Error;
+                    RailwayLogging.Logger?.LogOperation("Zip", "both results succeeded", timer.Elapsed);
+                    output = new Result<(T1, T2)>.Ok((ok1.Value, ok2.Value));
                 }
-            );
+                else
+                {
+                    Result<T2>.Fail fail2 = (Result<T2>.Fail)second;
+                    RailwayLogging.Logger?.LogOperation("Zip", "second result failed", timer.Elapsed, fail2.Error);
+                    output = new Result<(T1, T2)>.Fail(fail2.Error);
+                }
+            }
+            else
+            {
+                Result<T1>.Fail fail1 = (Result<T1>.Fail)first;
+                RailwayLogging.Logger?.LogOperation("Zip", "first result failed", timer.Elapsed, fail1.Error);
+                output = new Result<(T1, T2)>.Fail(fail1.Error);
+            }
 
             return output;
         }
@@ -75,13 +78,21 @@ public static class ResultCombineExtensions
         Result<T2> second,
         Result<T3> third)
     {
-        return first.Zip(second).Match<Result<(T1, T2, T3)>>(
-            ok12 => third.Match<Result<(T1, T2, T3)>>(
-                ok3 => (ok12.Value.Item1, ok12.Value.Item2, ok3.Value),
-                fail3 => fail3.Error
-            ),
-            fail => fail.Error
-        );
+        Result<(T1, T2)> zipped = first.Zip(second);
+
+        if (zipped is Result<(T1, T2)>.Ok ok12)
+        {
+            if (third is Result<T3>.Ok ok3)
+            {
+                return new Result<(T1, T2, T3)>.Ok((ok12.Value.Item1, ok12.Value.Item2, ok3.Value));
+            }
+
+            Result<T3>.Fail fail3 = (Result<T3>.Fail)third;
+            return new Result<(T1, T2, T3)>.Fail(fail3.Error);
+        }
+
+        Result<(T1, T2)>.Fail fail = (Result<(T1, T2)>.Fail)zipped;
+        return new Result<(T1, T2, T3)>.Fail(fail.Error);
     }
 
     /// <summary>
@@ -227,10 +238,15 @@ public static class ResultCombineExtensions
 
         foreach (Result<T> result in results)
         {
-            result.Match(
-                ok => values.Add(ok.Value),
-                fail => errors.Add(fail.Error)
-            );
+            if (result is Result<T>.Ok ok)
+            {
+                values.Add(ok.Value);
+            }
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                errors.Add(fail.Error);
+            }
         }
 
         if (errors.Count > 0)

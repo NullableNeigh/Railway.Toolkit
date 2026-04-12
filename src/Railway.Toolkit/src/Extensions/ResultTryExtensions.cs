@@ -25,13 +25,13 @@ public static class ResultTryExtensions
             {
                 T result = func();
                 RailwayLogging.Logger?.LogOperation("Try", "succeeded", timer.Elapsed);
-                return result;
+                return new Result<T>.Ok(result);
             }
             catch (Exception ex)
             {
                 Error error = Error.FromException(ex, errorCode);
                 RailwayLogging.Logger?.LogOperation("Try", "caught exception", timer.Elapsed, error);
-                return error;
+                return new Result<T>.Fail(error);
             }
         }
     }
@@ -55,13 +55,13 @@ public static class ResultTryExtensions
             {
                 T result = await func().ConfigureAwait(false);
                 RailwayLogging.Logger?.LogOperation("TryAsync", "succeeded", timer.Elapsed);
-                return result;
+                return new Result<T>.Ok(result);
             }
             catch (Exception ex)
             {
                 Error error = Error.FromException(ex, errorCode);
                 RailwayLogging.Logger?.LogOperation("TryAsync", "caught exception", timer.Elapsed, error);
-                return error;
+                return new Result<T>.Fail(error);
             }
         }
     }
@@ -84,13 +84,13 @@ public static class ResultTryExtensions
             {
                 action();
                 RailwayLogging.Logger?.LogOperation("Try", "succeeded", timer.Elapsed);
-                return Unit.Value;
+                return new Result<Unit>.Ok(Unit.Value);
             }
             catch (Exception ex)
             {
                 Error error = Error.FromException(ex, errorCode);
                 RailwayLogging.Logger?.LogOperation("Try", "caught exception", timer.Elapsed, error);
-                return error;
+                return new Result<Unit>.Fail(error);
             }
         }
     }
@@ -110,11 +110,11 @@ public static class ResultTryExtensions
         try
         {
             await action().ConfigureAwait(false);
-            return Unit.Value;
+            return new Result<Unit>.Ok(Unit.Value);
         }
         catch (Exception ex)
         {
-            return Error.FromException(ex, errorCode);
+            return new Result<Unit>.Fail(Error.FromException(ex, errorCode));
         }
     }
 
@@ -135,20 +135,20 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        return result.Match<Result<TOut>>(
-            ok =>
+        if (result is Result<TIn>.Ok ok)
+        {
+            try
             {
-                try
-                {
-                    return mapper(ok.Value);
-                }
-                catch (Exception ex)
-                {
-                    return Error.FromException(ex, errorCode);
-                }
-            },
-            fail => fail.Error
-        );
+                return new Result<TOut>.Ok(mapper(ok.Value));
+            }
+            catch (Exception ex)
+            {
+                return new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+            }
+        }
+
+        Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+        return new Result<TOut>.Fail(fail.Error);
     }
 
     /// <summary>
@@ -167,21 +167,21 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        return await result.Match<Task<Result<TOut>>>(
-            async ok =>
+        if (result is Result<TIn>.Ok ok)
+        {
+            try
             {
-                try
-                {
-                    TOut? value = await mapper(ok.Value).ConfigureAwait(false);
-                    return value;
-                }
-                catch (Exception ex)
-                {
-                    return Error.FromException(ex, errorCode);
-                }
-            },
-            fail => Task.FromResult<Result<TOut>>(fail.Error)
-        ).ConfigureAwait(false);
+                TOut value = await mapper(ok.Value).ConfigureAwait(false);
+                return new Result<TOut>.Ok(value);
+            }
+            catch (Exception ex)
+            {
+                return new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+            }
+        }
+
+        Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+        return new Result<TOut>.Fail(fail.Error);
     }
 
     /// <summary>
@@ -201,20 +201,20 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(binder);
 
-        return result.Match<Result<TOut>>(
-            ok =>
+        if (result is Result<TIn>.Ok ok)
+        {
+            try
             {
-                try
-                {
-                    return binder(ok.Value);
-                }
-                catch (Exception ex)
-                {
-                    return Error.FromException(ex, errorCode);
-                }
-            },
-            fail => fail.Error
-        );
+                return binder(ok.Value);
+            }
+            catch (Exception ex)
+            {
+                return new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+            }
+        }
+
+        Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+        return new Result<TOut>.Fail(fail.Error);
     }
 
     /// <summary>
@@ -233,19 +233,19 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(binder);
 
-        return await result.Match<Task<Result<TOut>>>(
-            async ok =>
+        if (result is Result<TIn>.Ok ok)
+        {
+            try
             {
-                try
-                {
-                    return await binder(ok.Value).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    return Error.FromException(ex, errorCode);
-                }
-            },
-            fail => Task.FromResult<Result<TOut>>(fail.Error)
-        ).ConfigureAwait(false);
+                return await binder(ok.Value).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                return new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+            }
+        }
+
+        Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+        return new Result<TOut>.Fail(fail.Error);
     }
 }

@@ -11,126 +11,13 @@ public static class ResultMatchExtensions
         this global::System.Threading.Tasks.Task<Result<T>> unionTask,
         global::System.Func<Result<T>.Ok, TMatchOutput> @ok,
         global::System.Func<Result<T>.Fail, TMatchOutput> @fail
-    )
-    => (await unionTask.ConfigureAwait(false)).Match(
-            @ok,
-            @fail
-        );
+    ) => (await unionTask.ConfigureAwait(false)).Match(@ok, @fail);
+
     public static async global::System.Threading.Tasks.ValueTask<TMatchOutput> MatchAsync<TMatchOutput, T>(
         this global::System.Threading.Tasks.ValueTask<Result<T>> unionTask,
         global::System.Func<Result<T>.Ok, TMatchOutput> @ok,
         global::System.Func<Result<T>.Fail, TMatchOutput> @fail
-    )
-    => (await unionTask.ConfigureAwait(false)).Match(
-            @ok,
-            @fail
-        );
-    public static async global::System.Threading.Tasks.Task MatchAsync<T>(
-        this global::System.Threading.Tasks.Task<Result<T>> unionTask,
-        global::System.Action<Result<T>.Ok> @ok,
-        global::System.Action<Result<T>.Fail> @fail
-    )
-    => (await unionTask.ConfigureAwait(false)).Match(
-            @ok,
-            @fail
-        );
-    public static async global::System.Threading.Tasks.ValueTask MatchAsync<T>(
-        this global::System.Threading.Tasks.ValueTask<Result<T>> unionTask,
-        global::System.Action<Result<T>.Ok> @ok,
-        global::System.Action<Result<T>.Fail> @fail
-    )
-    => (await unionTask.ConfigureAwait(false)).Match(
-            @ok,
-            @fail
-        );
-    public static async global::System.Threading.Tasks.Task<TMatchOutput> MatchOkAsync<T, TMatchOutput>(
-        this global::System.Threading.Tasks.Task<Result<T>> unionTask,
-        global::System.Func<Result<T>.Ok, TMatchOutput> @ok,
-        global::System.Func<TMatchOutput> @else
-    )
-        =>
-            (await unionTask.ConfigureAwait(false))
-                .MatchOk(
-                    @ok,
-                    @else
-                );
-    public static async global::System.Threading.Tasks.Task<TMatchOutput> MatchFailAsync<T, TMatchOutput>(
-        this global::System.Threading.Tasks.Task<Result<T>> unionTask,
-        global::System.Func<Result<T>.Fail, TMatchOutput> @fail,
-        global::System.Func<TMatchOutput> @else
-    )
-        =>
-            (await unionTask.ConfigureAwait(false))
-                .MatchFail(
-                    @fail,
-                    @else
-                );
-    public static async global::System.Threading.Tasks.ValueTask<TMatchOutput> MatchOkAsync<T, TMatchOutput>(
-        this global::System.Threading.Tasks.ValueTask<Result<T>> unionTask,
-        global::System.Func<Result<T>.Ok, TMatchOutput> @ok,
-        global::System.Func<TMatchOutput> @else
-    )
-        =>
-            (await unionTask.ConfigureAwait(false))
-                .MatchOk(
-                    @ok,
-                    @else
-                );
-    public static async global::System.Threading.Tasks.ValueTask<TMatchOutput> MatchFailAsync<T, TMatchOutput>(
-        this global::System.Threading.Tasks.ValueTask<Result<T>> unionTask,
-        global::System.Func<Result<T>.Fail, TMatchOutput> @fail,
-        global::System.Func<TMatchOutput> @else
-    )
-        =>
-            (await unionTask.ConfigureAwait(false))
-                .MatchFail(
-                    @fail,
-                    @else
-                );
-    public static async global::System.Threading.Tasks.Task MatchOkAsync<T>(
-        this global::System.Threading.Tasks.Task<Result<T>> unionTask,
-        global::System.Action<Result<T>.Ok> @ok,
-        global::System.Action @else
-    )
-        =>
-            (await unionTask.ConfigureAwait(false))
-                .MatchOk(
-                    @ok,
-                    @else
-                );
-    public static async global::System.Threading.Tasks.Task MatchFailAsync<T>(
-        this global::System.Threading.Tasks.Task<Result<T>> unionTask,
-        global::System.Action<Result<T>.Fail> @fail,
-        global::System.Action @else
-    )
-        =>
-            (await unionTask.ConfigureAwait(false))
-                .MatchFail(
-                    @fail,
-                    @else
-                );
-    public static async global::System.Threading.Tasks.ValueTask MatchOkAsync<T>(
-        this global::System.Threading.Tasks.ValueTask<Result<T>> unionTask,
-        global::System.Action<Result<T>.Ok> @ok,
-        global::System.Action @else
-    )
-        =>
-            (await unionTask.ConfigureAwait(false))
-                .MatchOk(
-                    @ok,
-                    @else
-                );
-    public static async global::System.Threading.Tasks.ValueTask MatchFailAsync<T>(
-        this global::System.Threading.Tasks.ValueTask<Result<T>> unionTask,
-        global::System.Action<Result<T>.Fail> @fail,
-        global::System.Action @else
-    )
-        =>
-            (await unionTask.ConfigureAwait(false))
-                .MatchFail(
-                    @fail,
-                    @else
-                );
+    ) => (await unionTask.ConfigureAwait(false)).Match(@ok, @fail);
 }
 
 #pragma warning restore 1591
