@@ -195,3 +195,22 @@ public class ResultTests
         Assert.Equal(42, value);
     }
 }
+
+public class ResultOkUnitTests
+{
+    [Fact]
+    public void Ok_WithNoParams_ShouldReturnOkUnit()
+    {
+        Result<Unit> result = Result.Ok();
+
+        Assert.IsType<Result<Unit>.Ok>(result);
+    }
+
+    [Fact]
+    public void Ok_WithNoParams_ShouldContainUnitValue()
+    {
+        Result<Unit>.Ok result = Assert.IsType<Result<Unit>.Ok>(Result.Ok());
+
+        Assert.Equal(Unit.Value, result.Value);
+    }
+}

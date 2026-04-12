@@ -193,3 +193,151 @@ public class ResultTapTests
         Assert.Equal(42, output.Match(ok => ok.Value, fail => 0));
     }
 }
+
+[Trait("Category", "Tap")]
+public class ResultFinallyTests
+{
+    [Fact]
+    public void Finally_WithOkResult_ShouldExecuteAction()
+    {
+        bool executed = false;
+        Result<int> result = Result.Ok(42).Finally(() => executed = true);
+
+        Assert.True(executed);
+        Assert.IsType<Result<int>.Ok>(result);
+    }
+
+    [Fact]
+    public void Finally_WithFailResult_ShouldExecuteAction()
+    {
+        bool executed = false;
+        Result<int> result = Result.Fail<int>(Error.Create("error", "Test.Error")).Finally(() => executed = true);
+
+        Assert.True(executed);
+        Assert.IsType<Result<int>.Fail>(result);
+    }
+
+    [Fact]
+    public void Finally_ShouldPassThroughOriginalResult()
+    {
+        Result<int> original = Result.Ok(42);
+        Result<int> output = original.Finally(() => { });
+
+        Result<int>.Ok ok = Assert.IsType<Result<int>.Ok>(output);
+        Assert.Equal(42, ok.Value);
+    }
+
+    [Fact]
+    public void Finally_WithResultContext_OnOkResult_ShouldReceiveResult()
+    {
+        bool wasOk = false;
+        Result<int> result = Result.Ok(42).Finally(r => wasOk = r is Result<int>.Ok);
+
+        Assert.True(wasOk);
+    }
+
+    [Fact]
+    public void Finally_WithResultContext_OnFailResult_ShouldReceiveResult()
+    {
+        bool wasFail = false;
+        Result<int> result = Result.Fail<int>(Error.Create("error", "Test.Error"))
+            .Finally(r => wasFail = r is Result<int>.Fail);
+
+        Assert.True(wasFail);
+    }
+
+    [Fact]
+    public async Task FinallyAsync_WithOkResult_ShouldExecuteAction()
+    {
+        bool executed = false;
+        Result<int> result = await Result.Ok(42).FinallyAsync(async () =>
+        {
+            await Task.Yield();
+            executed = true;
+        });
+
+        Assert.True(executed);
+        Assert.IsType<Result<int>.Ok>(result);
+    }
+
+    [Fact]
+    public async Task FinallyAsync_WithFailResult_ShouldExecuteAction()
+    {
+        bool executed = false;
+        Result<int> result = await Result.Fail<int>(Error.Create("error", "Test.Error"))
+            .FinallyAsync(async () =>
+            {
+                await Task.Yield();
+                executed = true;
+            });
+
+        Assert.True(executed);
+        Assert.IsType<Result<int>.Fail>(result);
+    }
+
+    [Fact]
+    public async Task FinallyAsync_OnTaskResult_ShouldExecuteAction()
+    {
+        bool executed = false;
+        Result<int> result = await Task.FromResult(Result.Ok(42))
+            .FinallyAsync(() => executed = true);
+
+        Assert.True(executed);
+        Assert.IsType<Result<int>.Ok>(result);
+    }
+
+    [Fact]
+    public async Task FinallyAsync_OnTaskResult_WithAsyncAction_ShouldExecuteAction()
+    {
+        bool executed = false;
+        Result<int> result = await Task.FromResult(Result.Ok(42))
+            .FinallyAsync(async () =>
+            {
+                await Task.Yield();
+                executed = true;
+            });
+
+        Assert.True(executed);
+        Assert.IsType<Result<int>.Ok>(result);
+    }
+}
+
+[Trait("Category", "Tap")]
+public class ResultTapActionTests
+{
+    [Fact]
+    public void Tap_WithAction_OnOkResult_ShouldExecute()
+    {
+        bool executed = false;
+        Result.Ok(42).Tap(() => executed = true);
+
+        Assert.True(executed);
+    }
+
+    [Fact]
+    public void Tap_WithAction_OnFailResult_ShouldNotExecute()
+    {
+        bool executed = false;
+        Result.Fail<int>(Error.Create("error", "Test.Error")).Tap(() => executed = true);
+
+        Assert.False(executed);
+    }
+
+    [Fact]
+    public void TapError_WithAction_OnFailResult_ShouldExecute()
+    {
+        bool executed = false;
+        Result.Fail<int>(Error.Create("error", "Test.Error")).TapError(() => executed = true);
+
+        Assert.True(executed);
+    }
+
+    [Fact]
+    public void TapError_WithAction_OnOkResult_ShouldNotExecute()
+    {
+        bool executed = false;
+        Result.Ok(42).TapError(() => executed = true);
+
+        Assert.False(executed);
+    }
+}
