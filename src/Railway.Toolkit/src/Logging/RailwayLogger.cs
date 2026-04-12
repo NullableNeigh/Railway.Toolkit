@@ -39,7 +39,7 @@ internal sealed class RailwayLogger : IRailwayLogger
         }
 
         // Apply slow operation threshold filter
-        if (_options.SlowOperationThreshold.HasValue && duration < _options.SlowOperationThreshold.Value)
+        if (_options.LogSlowOperationsOnly && duration < _options.SlowOperationThreshold)
         {
             return;
         }

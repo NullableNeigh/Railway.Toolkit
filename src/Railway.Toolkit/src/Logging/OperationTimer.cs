@@ -10,7 +10,6 @@ internal sealed class OperationTimer : IDisposable
 {
     private readonly TimingStrategy _strategy;
     private readonly Stopwatch? _stopwatch;
-    private readonly DateTime _startTime;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OperationTimer"/> class.
@@ -22,12 +21,9 @@ internal sealed class OperationTimer : IDisposable
 
         switch (strategy)
         {
-            case TimingStrategy.HighPrecision:
+            case TimingStrategy.Timestamp:
+            case TimingStrategy.Stopwatch:
                 _stopwatch = Stopwatch.StartNew();
-                break;
-
-            case TimingStrategy.Standard:
-                _startTime = DateTime.UtcNow;
                 break;
 
             case TimingStrategy.None:
@@ -45,8 +41,8 @@ internal sealed class OperationTimer : IDisposable
         {
             return _strategy switch
             {
-                TimingStrategy.HighPrecision => _stopwatch?.Elapsed ?? TimeSpan.Zero,
-                TimingStrategy.Standard => DateTime.UtcNow - _startTime,
+                TimingStrategy.Timestamp => _stopwatch?.Elapsed ?? TimeSpan.Zero,
+                TimingStrategy.Stopwatch => _stopwatch?.Elapsed ?? TimeSpan.Zero,
                 TimingStrategy.None => TimeSpan.Zero,
                 _ => TimeSpan.Zero
             };
