@@ -19,21 +19,23 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(func);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        // Static Try has no Result input — use Unit to represent "starting fresh"
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        Result<T> output;
+
+        try
         {
-            try
-            {
-                T result = func();
-                RailwayLogging.Logger?.LogOperation("Try", "succeeded", timer.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                Error error = Error.FromException(ex, errorCode);
-                RailwayLogging.Logger?.LogOperation("Try", "caught exception", timer.Elapsed, error);
-                return error;
-            }
+            output = new Result<T>.Ok(func());
         }
+        catch (Exception ex)
+        {
+            output = new Result<T>.Fail(Error.FromException(ex, errorCode));
+        }
+
+        RailwayLogging.Logger?.LogOperation("Try", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -49,21 +51,22 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(func);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        Result<T> output;
+
+        try
         {
-            try
-            {
-                T result = await func().ConfigureAwait(false);
-                RailwayLogging.Logger?.LogOperation("TryAsync", "succeeded", timer.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                Error error = Error.FromException(ex, errorCode);
-                RailwayLogging.Logger?.LogOperation("TryAsync", "caught exception", timer.Elapsed, error);
-                return error;
-            }
+            output = new Result<T>.Ok(await func().ConfigureAwait(false));
         }
+        catch (Exception ex)
+        {
+            output = new Result<T>.Fail(Error.FromException(ex, errorCode));
+        }
+
+        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -78,21 +81,23 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        Result<Unit> output;
+
+        try
         {
-            try
-            {
-                action();
-                RailwayLogging.Logger?.LogOperation("Try", "succeeded", timer.Elapsed);
-                return Unit.Value;
-            }
-            catch (Exception ex)
-            {
-                Error error = Error.FromException(ex, errorCode);
-                RailwayLogging.Logger?.LogOperation("Try", "caught exception", timer.Elapsed, error);
-                return error;
-            }
+            action();
+            output = new Result<Unit>.Ok(Unit.Value);
         }
+        catch (Exception ex)
+        {
+            output = new Result<Unit>.Fail(Error.FromException(ex, errorCode));
+        }
+
+        RailwayLogging.Logger?.LogOperation("Try", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -107,15 +112,23 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        Result<Unit> output;
+
         try
         {
             await action().ConfigureAwait(false);
-            return Unit.Value;
+            output = new Result<Unit>.Ok(Unit.Value);
         }
         catch (Exception ex)
         {
-            return Error.FromException(ex, errorCode);
+            output = new Result<Unit>.Fail(Error.FromException(ex, errorCode));
         }
+
+        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -135,20 +148,29 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        return result.Match<Result<TOut>>(
-            ok =>
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
+        {
+            try
             {
-                try
-                {
-                    return mapper(ok.Value);
-                }
-                catch (Exception ex)
-                {
-                    return Error.FromException(ex, errorCode);
-                }
-            },
-            fail => fail.Error
-        );
+                output = new Result<TOut>.Ok(mapper(ok.Value));
+            }
+            catch (Exception ex)
+            {
+                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+            }
+        }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("TryMap", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -167,21 +189,29 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        return await result.Match<Task<Result<TOut>>>(
-            async ok =>
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
+        {
+            try
             {
-                try
-                {
-                    TOut? value = await mapper(ok.Value).ConfigureAwait(false);
-                    return value;
-                }
-                catch (Exception ex)
-                {
-                    return Error.FromException(ex, errorCode);
-                }
-            },
-            fail => Task.FromResult<Result<TOut>>(fail.Error)
-        ).ConfigureAwait(false);
+                output = new Result<TOut>.Ok(await mapper(ok.Value).ConfigureAwait(false));
+            }
+            catch (Exception ex)
+            {
+                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+            }
+        }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("TryMapAsync", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -201,20 +231,29 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(binder);
 
-        return result.Match<Result<TOut>>(
-            ok =>
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
+        {
+            try
             {
-                try
-                {
-                    return binder(ok.Value);
-                }
-                catch (Exception ex)
-                {
-                    return Error.FromException(ex, errorCode);
-                }
-            },
-            fail => fail.Error
-        );
+                output = binder(ok.Value);
+            }
+            catch (Exception ex)
+            {
+                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+            }
+        }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("TryBind", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -233,19 +272,28 @@ public static class ResultTryExtensions
     {
         ArgumentNullException.ThrowIfNull(binder);
 
-        return await result.Match<Task<Result<TOut>>>(
-            async ok =>
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
+        {
+            try
             {
-                try
-                {
-                    return await binder(ok.Value).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    return Error.FromException(ex, errorCode);
-                }
-            },
-            fail => Task.FromResult<Result<TOut>>(fail.Error)
-        ).ConfigureAwait(false);
+                output = await binder(ok.Value).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+            }
+        }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("TryBindAsync", result, output, timer.GetElapsed());
+        return output;
     }
 }

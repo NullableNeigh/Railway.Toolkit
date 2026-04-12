@@ -1,10 +1,11 @@
 using Microsoft.Extensions.Logging;
+using System.Runtime.CompilerServices;
 
 namespace Railway.Toolkit;
 
 /// <summary>
-/// Implementation of <see cref="IRailwayLogger"/> that wraps Microsoft.Extensions.Logging.ILogger.
-/// Handles filtering, sampling, and message formatting.
+/// Implementation of <see cref="IRailwayLogger"/> that writes to Microsoft.Extensions.Logging.
+/// Inspects the full input/output Result context to determine log level, message, and structured data.
 /// </summary>
 internal sealed class RailwayLogger : IRailwayLogger
 {
@@ -12,58 +13,72 @@ internal sealed class RailwayLogger : IRailwayLogger
     private readonly RailwayLoggingOptions _options;
     private static int _operationCount = 0;
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="RailwayLogger"/> class.
-    /// </summary>
-    /// <param name="logger">The underlying Microsoft.Extensions.Logging.ILogger.</param>
-    /// <param name="options">The logging configuration options.</param>
     public RailwayLogger(ILogger logger, RailwayLoggingOptions options)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger;
+        _options = options;
     }
 
-    /// <summary>
-    /// Logs a railway operation with its status and duration.
-    /// </summary>
-    /// <param name="operationName">The name of the operation.</param>
-    /// <param name="status">The status of the operation.</param>
-    /// <param name="duration">The duration of the operation.</param>
-    /// <param name="error">Optional error details.</param>
-    public void LogOperation(string operationName, string status, TimeSpan duration, Error? error = null)
+    /// <inheritdoc />
+    public void LogOperation<TIn, TOut>(
+        string operation,
+        Result<TIn> input,
+        Result<TOut> output,
+        TimeSpan elapsed)
     {
-        // Check if logging is enabled
         if (!_options.Enabled)
         {
             return;
         }
 
-        // Apply slow operation threshold filter
-        if (_options.SlowOperationThreshold.HasValue && duration < _options.SlowOperationThreshold.Value)
+        if (_options.LogSlowOperationsOnly && elapsed < _options.SlowOperationThreshold)
         {
             return;
         }
 
-        // Apply sampling
         if (!ShouldLog())
         {
             return;
         }
 
-        // Format the log message
-        string message = FormatMessage(operationName, status, duration, error);
+        bool inputWasOk = input is Result<TIn>.Ok;
+        bool outputIsOk = output is Result<TOut>.Ok;
+        bool isSlow = elapsed > _options.SlowOperationThreshold;
 
-        // Determine log level based on status
-        LogLevel logLevel = DetermineLogLevel(status, error);
+        LogLevel logLevel = DetermineLogLevel(inputWasOk, outputIsOk, isSlow);
+        string emoji = isSlow ? "🐌" : "🚂";
 
-        // Log the message
-        _logger.Log(logLevel, message);
+        Dictionary<string, object> scopeData = BuildScopeData<TIn, TOut>(operation, outputIsOk, elapsed);
+
+        if (_options.LogSuccessValues && output is Result<TOut>.Ok okOutput)
+        {
+            scopeData["OutputValue"] = okOutput.Value?.ToString() ?? "null";
+        }
+
+        using IDisposable? scope = _logger.BeginScope(scopeData);
+
+        if (!inputWasOk)
+        {
+            // Already on failure track — operation was skipped
+            _logger.Log(logLevel, "{Emoji} \"{Operation}\" skipped, {Duration}",
+                emoji, operation, FormatDuration(elapsed));
+        }
+        else if (outputIsOk)
+        {
+            // Success track — operation executed and stayed on success track
+            _logger.Log(logLevel, "{Emoji} \"{Operation}\" executed ✓, {Duration}",
+                emoji, operation, FormatDuration(elapsed));
+        }
+        else
+        {
+            // Success -> Failure — operation switched to failure track
+            Result<TOut>.Fail fail = (Result<TOut>.Fail)output;
+            _logger.Log(logLevel, "{Emoji} \"{Operation}\" failed ({ErrorMessage}), {Duration}",
+                emoji, operation, fail.Error.Message, FormatDuration(elapsed));
+        }
     }
 
-    /// <summary>
-    /// Determines whether this operation should be logged based on sampling rate.
-    /// </summary>
-    /// <returns>True if the operation should be logged; otherwise, false.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool ShouldLog()
     {
         if (_options.SamplingRate <= 0)
@@ -73,38 +88,50 @@ internal sealed class RailwayLogger : IRailwayLogger
 
         if (_options.SamplingRate == 1)
         {
-            return true; // Log every operation
+            return true;
         }
 
         int count = Interlocked.Increment(ref _operationCount);
         return (count % _options.SamplingRate) == 0;
     }
 
-    /// <summary>
-    /// Formats the log message with the railway emoji and operation details.
-    /// </summary>
-    /// <param name="operationName">The operation name.</param>
-    /// <param name="status">The operation status.</param>
-    /// <param name="duration">The operation duration.</param>
-    /// <param name="error">Optional error details.</param>
-    /// <returns>The formatted log message.</returns>
-    private static string FormatMessage(string operationName, string status, TimeSpan duration, Error? error)
+    private static Dictionary<string, object> BuildScopeData<TIn, TOut>(
+        string operation,
+        bool success,
+        TimeSpan elapsed)
     {
-        string durationText = FormatDuration(duration);
-
-        if (error != null)
+        return new Dictionary<string, object>
         {
-            return $"🚂 \"{operationName}\" {status} ({error.Message}), {durationText}";
-        }
-
-        return $"🚂 \"{operationName}\" {status}, {durationText}";
+            ["Operation"] = operation,
+            ["InputType"] = typeof(TIn).Name,
+            ["OutputType"] = typeof(TOut).Name,
+            ["Success"] = success,
+            ["DurationMs"] = elapsed.TotalMilliseconds
+        };
     }
 
-    /// <summary>
-    /// Formats the duration in a human-readable format.
-    /// </summary>
-    /// <param name="duration">The duration to format.</param>
-    /// <returns>The formatted duration string.</returns>
+    private static LogLevel DetermineLogLevel(bool inputWasOk, bool outputIsOk, bool isSlow)
+    {
+        if (isSlow)
+        {
+            return LogLevel.Warning;
+        }
+
+        if (inputWasOk && !outputIsOk)
+        {
+            // Switched to failure track
+            return LogLevel.Warning;
+        }
+
+        if (!inputWasOk)
+        {
+            // Skipped — already on failure track, low signal
+            return LogLevel.Debug;
+        }
+
+        return LogLevel.Debug;
+    }
+
     private static string FormatDuration(TimeSpan duration)
     {
         if (duration.TotalMilliseconds < 1)
@@ -123,29 +150,5 @@ internal sealed class RailwayLogger : IRailwayLogger
         }
 
         return $"{duration.TotalMinutes:F2}m";
-    }
-
-    /// <summary>
-    /// Determines the appropriate log level based on operation status.
-    /// </summary>
-    /// <param name="status">The operation status.</param>
-    /// <param name="error">Optional error details.</param>
-    /// <returns>The appropriate log level.</returns>
-    private static LogLevel DetermineLogLevel(string status, Error? error)
-    {
-        // Operations with errors are warnings
-        if (error != null || status.Contains("failed", StringComparison.OrdinalIgnoreCase))
-        {
-            return LogLevel.Warning;
-        }
-
-        // Track switches (success↔failure) are informational
-        if (status.Contains("switched", StringComparison.OrdinalIgnoreCase))
-        {
-            return LogLevel.Information;
-        }
-
-        // Everything else is debug level
-        return LogLevel.Debug;
     }
 }

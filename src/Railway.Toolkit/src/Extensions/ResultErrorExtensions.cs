@@ -21,24 +21,22 @@ public static class ResultErrorExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
-        {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
-                {
-                    RailwayLogging.Logger?.LogOperation("MapError", "skipped (on success track)", timer.Elapsed);
-                    return ok.Value;
-                },
-                fail =>
-                {
-                    Error mappedError = mapper(fail.Error);
-                    RailwayLogging.Logger?.LogOperation("MapError", "executed", timer.Elapsed, mappedError);
-                    return mappedError;
-                }
-            );
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-            return output;
+        Result<T> output;
+
+        if (result is Result<T>.Ok ok)
+        {
+            output = new Result<T>.Ok(ok.Value);
         }
+        else
+        {
+            Result<T>.Fail fail = (Result<T>.Fail)result;
+            output = new Result<T>.Fail(mapper(fail.Error));
+        }
+
+        RailwayLogging.Logger?.LogOperation("MapError", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -71,24 +69,22 @@ public static class ResultErrorExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
-        {
-            Result<T> output = await result.Match<Task<Result<T>>>(
-                ok =>
-                {
-                    RailwayLogging.Logger?.LogOperation("MapErrorAsync", "skipped (on success track)", timer.Elapsed);
-                    return Task.FromResult<Result<T>>(ok.Value);
-                },
-                async fail =>
-                {
-                    Error mappedError = await mapper(fail.Error).ConfigureAwait(false);
-                    RailwayLogging.Logger?.LogOperation("MapErrorAsync", "executed", timer.Elapsed, mappedError);
-                    return mappedError;
-                }
-            ).ConfigureAwait(false);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-            return output;
+        Result<T> output;
+
+        if (result is Result<T>.Ok ok)
+        {
+            output = new Result<T>.Ok(ok.Value);
         }
+        else
+        {
+            Result<T>.Fail fail = (Result<T>.Fail)result;
+            output = new Result<T>.Fail(await mapper(fail.Error).ConfigureAwait(false));
+        }
+
+        RailwayLogging.Logger?.LogOperation("MapErrorAsync", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -120,23 +116,14 @@ public static class ResultErrorExtensions
         this Result<T> result,
         T defaultValue)
     {
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
-        {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
-                {
-                    RailwayLogging.Logger?.LogOperation("OrElse", "skipped (on success track)", timer.Elapsed);
-                    return ok.Value;
-                },
-                fail =>
-                {
-                    RailwayLogging.Logger?.LogOperation("OrElse", "switched to success track", timer.Elapsed);
-                    return defaultValue;
-                }
-            );
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-            return output;
-        }
+        Result<T> output = result is Result<T>.Ok ok
+            ? new Result<T>.Ok(ok.Value)
+            : new Result<T>.Ok(defaultValue);
+
+        RailwayLogging.Logger?.LogOperation("OrElse", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -152,23 +139,22 @@ public static class ResultErrorExtensions
     {
         ArgumentNullException.ThrowIfNull(defaultValueFactory);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
-        {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
-                {
-                    RailwayLogging.Logger?.LogOperation("OrElse", "skipped (on success track)", timer.Elapsed);
-                    return ok.Value;
-                },
-                fail =>
-                {
-                    RailwayLogging.Logger?.LogOperation("OrElse", "switched to success track", timer.Elapsed);
-                    return defaultValueFactory(fail.Error);
-                }
-            );
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-            return output;
+        Result<T> output;
+
+        if (result is Result<T>.Ok ok)
+        {
+            output = new Result<T>.Ok(ok.Value);
         }
+        else
+        {
+            Result<T>.Fail fail = (Result<T>.Fail)result;
+            output = new Result<T>.Ok(defaultValueFactory(fail.Error));
+        }
+
+        RailwayLogging.Logger?.LogOperation("OrElse", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -183,26 +169,14 @@ public static class ResultErrorExtensions
         this Result<T> result,
         Result<T> alternative)
     {
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
-        {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
-                {
-                    RailwayLogging.Logger?.LogOperation("OrElseWith", "skipped (on success track)", timer.Elapsed);
-                    return ok.Value;
-                },
-                fail =>
-                {
-                    alternative.Match(
-                        okAlt => RailwayLogging.Logger?.LogOperation("OrElseWith", "switched to success track", timer.Elapsed),
-                        failAlt => RailwayLogging.Logger?.LogOperation("OrElseWith", "executed (stayed on failure track)", timer.Elapsed, failAlt.Error)
-                    );
-                    return alternative;
-                }
-            );
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-            return output;
-        }
+        Result<T> output = result is Result<T>.Ok ok
+            ? new Result<T>.Ok(ok.Value)
+            : alternative;
+
+        RailwayLogging.Logger?.LogOperation("OrElseWith", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -218,27 +192,22 @@ public static class ResultErrorExtensions
     {
         ArgumentNullException.ThrowIfNull(alternativeFactory);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
-        {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
-                {
-                    RailwayLogging.Logger?.LogOperation("OrElseWith", "skipped (on success track)", timer.Elapsed);
-                    return ok.Value;
-                },
-                fail =>
-                {
-                    Result<T> alternative = alternativeFactory(fail.Error);
-                    alternative.Match(
-                        okAlt => RailwayLogging.Logger?.LogOperation("OrElseWith", "switched to success track", timer.Elapsed),
-                        failAlt => RailwayLogging.Logger?.LogOperation("OrElseWith", "executed (stayed on failure track)", timer.Elapsed, failAlt.Error)
-                    );
-                    return alternative;
-                }
-            );
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-            return output;
+        Result<T> output;
+
+        if (result is Result<T>.Ok ok)
+        {
+            output = new Result<T>.Ok(ok.Value);
         }
+        else
+        {
+            Result<T>.Fail fail = (Result<T>.Fail)result;
+            output = alternativeFactory(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("OrElseWith", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>

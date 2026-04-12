@@ -7,6 +7,16 @@ namespace Railway.Toolkit;
 public static class Result
 {
     /// <summary>
+    /// Creates a successful Result with no value (Unit).
+    /// Use this when an operation succeeds but has nothing to return.
+    /// </summary>
+    /// <returns>A Result in the Ok state with Unit value.</returns>
+    public static Result<Unit> Ok()
+    {
+        return new Result<Unit>.Ok(Unit.Value);
+    }
+
+    /// <summary>
     /// Creates a successful Result containing the specified value.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>

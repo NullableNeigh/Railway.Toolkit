@@ -24,32 +24,24 @@ public static class ResultEnsureExtensions
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
-        {
-            Result<T> output = result.Match<Result<T>>(
-                ok =>
-                {
-                    bool isValid = predicate(ok.Value);
-                    if (isValid)
-                    {
-                        RailwayLogging.Logger?.LogOperation("Ensure", "passed (stayed on success track)", timer.Elapsed);
-                        return ok.Value;
-                    }
-                    else
-                    {
-                        RailwayLogging.Logger?.LogOperation("Ensure", "failed (switched to failure track)", timer.Elapsed, error);
-                        return error;
-                    }
-                },
-                fail =>
-                {
-                    RailwayLogging.Logger?.LogOperation("Ensure", "skipped (on failure track)", timer.Elapsed);
-                    return fail.Error;
-                }
-            );
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-            return output;
+        Result<T> output;
+
+        if (result is Result<T>.Ok ok)
+        {
+            output = predicate(ok.Value)
+                ? new Result<T>.Ok(ok.Value)
+                : new Result<T>.Fail(error);
         }
+        else
+        {
+            Result<T>.Fail fail = (Result<T>.Fail)result;
+            output = new Result<T>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("Ensure", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -69,10 +61,15 @@ public static class ResultEnsureExtensions
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(errorFactory);
 
-        return result.Match<Result<T>>(
-            ok => predicate(ok.Value) ? ok.Value : errorFactory(ok.Value),
-            fail => fail.Error
-        );
+        if (result is Result<T>.Ok ok)
+        {
+            return predicate(ok.Value)
+                ? new Result<T>.Ok(ok.Value)
+                : new Result<T>.Fail(errorFactory(ok.Value));
+        }
+
+        Result<T>.Fail fail = (Result<T>.Fail)result;
+        return new Result<T>.Fail(fail.Error);
     }
 
     /// <summary>
@@ -83,17 +80,19 @@ public static class ResultEnsureExtensions
     /// <param name="predicate">The condition that must be true.</param>
     /// <param name="errorMessage">The error message if the predicate fails.</param>
     /// <param name="errorCode">The error code to use (defaults to "ValidationError").</param>
+    /// <param name="details">Optional structured field-level validation details.</param>
     /// <returns>The original result if Ok and predicate passes, otherwise Fail with the error.</returns>
     public static Result<T> Ensure<T>(
         this Result<T> result,
         Func<T, bool> predicate,
         string errorMessage,
-        string errorCode = "ValidationError")
+        string errorCode = "ValidationError",
+        IReadOnlyDictionary<string, string[]>? details = null)
     {
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(errorMessage);
 
-        Error error = Error.Create(errorMessage, errorCode);
+        Error error = new Error { Message = errorMessage, Code = errorCode, Details = details };
         return result.Ensure(predicate, error);
     }
 
@@ -133,32 +132,24 @@ public static class ResultEnsureExtensions
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
-        {
-            Result<T> output = await result.Match<Task<Result<T>>>(
-                async ok =>
-                {
-                    bool isValid = await predicate(ok.Value).ConfigureAwait(false);
-                    if (isValid)
-                    {
-                        RailwayLogging.Logger?.LogOperation("EnsureAsync", "passed (stayed on success track)", timer.Elapsed);
-                        return ok.Value;
-                    }
-                    else
-                    {
-                        RailwayLogging.Logger?.LogOperation("EnsureAsync", "failed (switched to failure track)", timer.Elapsed, error);
-                        return error;
-                    }
-                },
-                fail =>
-                {
-                    RailwayLogging.Logger?.LogOperation("EnsureAsync", "skipped (on failure track)", timer.Elapsed);
-                    return Task.FromResult<Result<T>>(fail.Error);
-                }
-            ).ConfigureAwait(false);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-            return output;
+        Result<T> output;
+
+        if (result is Result<T>.Ok ok)
+        {
+            output = await predicate(ok.Value).ConfigureAwait(false)
+                ? new Result<T>.Ok(ok.Value)
+                : new Result<T>.Fail(error);
         }
+        else
+        {
+            Result<T>.Fail fail = (Result<T>.Fail)result;
+            output = new Result<T>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("EnsureAsync", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -216,31 +207,21 @@ public static class ResultEnsureExtensions
     {
         ArgumentNullException.ThrowIfNull(validations);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<T> output = result;
+
+        foreach ((Func<T, bool>? predicate, Error? error) in validations)
         {
-            Result<T> currentResult = result;
-            int validationCount = 0;
+            output = output.Ensure(predicate, error);
 
-            foreach ((Func<T, bool>? predicate, Error? error) in validations)
+            if (output is Result<T>.Fail)
             {
-                currentResult = currentResult.Ensure(predicate, error); // Ensure already logs
-                validationCount++;
-
-                // Short-circuit if we've already failed
-                if (currentResult.Match(_ => false, _ => true))
-                {
-                    break;
-                }
+                break;
             }
-
-            bool allPassed = currentResult.Match(_ => true, _ => false);
-            string status = allPassed
-                ? $"all {validationCount} validation(s) passed"
-                : $"failed at validation {validationCount}";
-
-            RailwayLogging.Logger?.LogOperation("EnsureAll", status, timer.Elapsed);
-
-            return currentResult;
         }
+
+        RailwayLogging.Logger?.LogOperation("EnsureAll", result, output, timer.GetElapsed());
+        return output;
     }
 }
