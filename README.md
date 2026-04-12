@@ -414,6 +414,14 @@ See the [examples folder](./examples) for complete working examples:
 - Batch processing
 - Error recovery strategies
 
+## Development Approach
+
+This library is developed with the assistance of [Claude](https://claude.ai) (Anthropic's AI assistant) as a coding tool.
+
+In the interest of transparency: AI-assisted development can produce low-quality or unsafe code ("slop") when used without oversight. To mitigate this, every commit is reviewed by the author — a .NET developer with 20 years of experience — before it is merged. The AI assists with implementation speed; the human is responsible for correctness, design quality, and safety.
+
+If you spot anything that doesn't meet the bar, please open an issue.
+
 ## Contributing
 
 Contributions are welcome! Please:
