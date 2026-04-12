@@ -80,17 +80,19 @@ public static class ResultEnsureExtensions
     /// <param name="predicate">The condition that must be true.</param>
     /// <param name="errorMessage">The error message if the predicate fails.</param>
     /// <param name="errorCode">The error code to use (defaults to "ValidationError").</param>
+    /// <param name="details">Optional structured field-level validation details.</param>
     /// <returns>The original result if Ok and predicate passes, otherwise Fail with the error.</returns>
     public static Result<T> Ensure<T>(
         this Result<T> result,
         Func<T, bool> predicate,
         string errorMessage,
-        string errorCode = "ValidationError")
+        string errorCode = "ValidationError",
+        IReadOnlyDictionary<string, string[]>? details = null)
     {
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(errorMessage);
 
-        Error error = Error.Create(errorMessage, errorCode);
+        Error error = new Error { Message = errorMessage, Code = errorCode, Details = details };
         return result.Ensure(predicate, error);
     }
 
