@@ -1,112 +1,97 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Railway.Toolkit;
 
 /// <summary>
-/// Provides configuration for Railway.Toolkit logging.
+/// Provides scoped logging configuration for Railway.Toolkit operations.
+/// Uses AsyncLocal to isolate logging context per async execution flow,
+/// allowing concurrent operations to have independent logging configurations.
 /// </summary>
 public static class RailwayLogging
 {
-    private static IRailwayLogger? _logger;
-    private static RailwayLoggingOptions _options = new RailwayLoggingOptions();
-    private static readonly object _lock = new object();
+    private static readonly AsyncLocal<IRailwayLogger?> _logger = new AsyncLocal<IRailwayLogger?>();
+    private static readonly AsyncLocal<RailwayLoggingOptions?> _options = new AsyncLocal<RailwayLoggingOptions?>();
 
     /// <summary>
-    /// Gets the current logging options.
+    /// Gets the configured logger for the current async context.
+    /// Returns null if logging has not been enabled in this context.
     /// </summary>
-    internal static RailwayLoggingOptions Options => _options;
+    internal static IRailwayLogger? Logger => _logger.Value;
 
     /// <summary>
-    /// Gets the configured logger instance.
-    /// Returns null if logging is not configured or disabled.
+    /// Gets the logging options for the current async context.
+    /// Falls back to default options if none have been configured.
     /// </summary>
-    internal static IRailwayLogger? Logger => _options.Enabled ? _logger : null;
+    internal static RailwayLoggingOptions Options => _options.Value ?? new RailwayLoggingOptions();
 
     /// <summary>
-    /// Configures Railway.Toolkit logging with the specified logger and options.
+    /// Enables logging for the current async execution context.
+    /// Dispose the returned scope to restore the previous logging configuration.
     /// </summary>
-    /// <param name="logger">The Microsoft.Extensions.Logging.ILogger to use.</param>
-    /// <param name="configure">Optional action to configure logging options.</param>
-    public static void Configure(ILogger logger, Action<RailwayLoggingOptions>? configure = null)
+    /// <param name="logger">The Microsoft.Extensions.Logging.ILogger to write to.</param>
+    /// <param name="options">
+    /// Logging options. If null, uses <see cref="RailwayLoggingOptions.Default"/>
+    /// which selects sensible defaults based on ASPNETCORE_ENVIRONMENT.
+    /// </param>
+    /// <returns>
+    /// An <see cref="IDisposable"/> scope. Disposing it restores whatever logging
+    /// configuration was active before this call — useful for nested scopes in tests
+    /// or request pipelines.
+    /// </returns>
+    /// <example>
+    /// using (RailwayLogging.EnableLogging(logger))
+    /// {
+    ///     Result&lt;int&gt; result = Result.Ok(42).Map(x => x * 2);
+    /// }
+    /// </example>
+    public static IDisposable EnableLogging(ILogger logger, RailwayLoggingOptions? options = null)
     {
-        if (logger == null)
-        {
-            throw new ArgumentNullException(nameof(logger));
-        }
+        ArgumentNullException.ThrowIfNull(logger);
 
-        lock (_lock)
-        {
-            RailwayLoggingOptions options = new RailwayLoggingOptions();
-            configure?.Invoke(options);
+        IRailwayLogger? previousLogger = _logger.Value;
+        RailwayLoggingOptions? previousOptions = _options.Value;
 
-            _options = options;
-            _logger = new RailwayLogger(logger, options);
-        }
+        RailwayLoggingOptions resolvedOptions = options ?? RailwayLoggingOptions.Default;
+
+        _options.Value = resolvedOptions;
+        _logger.Value = resolvedOptions.Enabled ? new RailwayLogger(logger, resolvedOptions) : null;
+
+        return new LoggingScope(() =>
+        {
+            _logger.Value = previousLogger;
+            _options.Value = previousOptions;
+        });
     }
 
     /// <summary>
-    /// Configures Railway.Toolkit logging with default options.
+    /// Creates a timer for the current async context using the configured timing strategy.
+    /// Returns a <see cref="NullRailwayTimer"/> if no options are configured.
     /// </summary>
-    /// <param name="logger">The Microsoft.Extensions.Logging.ILogger to use.</param>
-    public static void Configure(ILogger logger)
+    internal static IRailwayTimer StartOperation()
     {
-        Configure(logger, null);
+        return RailwayTimerFactory.Create(Options);
     }
 
     /// <summary>
-    /// Configures Railway.Toolkit logging with options only (no logger).
-    /// Useful for updating options after initial configuration.
+    /// Manages the lifetime of a logging scope, restoring the previous context on dispose.
     /// </summary>
-    /// <param name="configure">Action to configure logging options.</param>
-    public static void ConfigureOptions(Action<RailwayLoggingOptions> configure)
+    private sealed class LoggingScope : IDisposable
     {
-        if (configure == null)
+        private readonly Action _restore;
+        private bool _disposed;
+
+        public LoggingScope(Action restore)
         {
-            throw new ArgumentNullException(nameof(configure));
+            _restore = restore;
         }
 
-        lock (_lock)
+        public void Dispose()
         {
-            RailwayLoggingOptions options = new RailwayLoggingOptions();
-            configure(options);
-
-            _options = options;
-
-            // Recreate logger with new options if one exists
-            if (_logger != null && _logger is RailwayLogger railwayLogger)
+            if (!_disposed)
             {
-                // Get the underlying ILogger through reflection or keep reference
-                // For now, just update options - the logger will use the new static Options
-                _logger = new RailwayLogger(
-                    new NullLogger<RailwayLogger>(),
-                    options
-                );
+                _disposed = true;
+                _restore();
             }
-        }
-    }
-
-    /// <summary>
-    /// Disables Railway.Toolkit logging.
-    /// </summary>
-    public static void Disable()
-    {
-        lock (_lock)
-        {
-            _options = new RailwayLoggingOptions { Enabled = false };
-            _logger = null;
-        }
-    }
-
-    /// <summary>
-    /// Resets logging configuration to defaults.
-    /// </summary>
-    public static void Reset()
-    {
-        lock (_lock)
-        {
-            _options = new RailwayLoggingOptions();
-            _logger = null;
         }
     }
 }
