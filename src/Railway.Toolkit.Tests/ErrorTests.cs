@@ -100,4 +100,123 @@ public class ErrorTests
     {
         Assert.Throws<ArgumentException>(() => Error.Aggregate(Array.Empty<Error>()));
     }
+
+    [Fact]
+    public void Aggregate_WhenNoErrorsHaveDetails_ShouldHaveNullDetails()
+    {
+        Error error1 = Error.Create("Database timed out", "Database.Timeout");
+        Error error2 = Error.Create("Cache unavailable", "Cache.Miss");
+
+        Error aggregated = Error.Aggregate(new[] { error1, error2 });
+
+        Assert.Null(aggregated.Details);
+    }
+
+    [Fact]
+    public void Aggregate_WhenErrorsHaveDetails_ShouldMergeDetails()
+    {
+        Error error1 = new Error
+        {
+            Message = "Validation failed",
+            Code = "Validation.Failed",
+            Details = ErrorDetailsBuilder.Create()
+                .AddDetail("Email", "Invalid format")
+                .Build()
+        };
+
+        Error error2 = new Error
+        {
+            Message = "Validation failed",
+            Code = "Validation.Failed",
+            Details = ErrorDetailsBuilder.Create()
+                .AddDetail("Age", "Must be at least 18")
+                .Build()
+        };
+
+        Error aggregated = Error.Aggregate(new[] { error1, error2 });
+
+        Assert.NotNull(aggregated.Details);
+        Assert.True(aggregated.Details.ContainsKey("Email"));
+        Assert.True(aggregated.Details.ContainsKey("Age"));
+    }
+
+    [Fact]
+    public void Aggregate_WhenSameFieldAcrossErrors_ShouldCombineMessages()
+    {
+        Error error1 = new Error
+        {
+            Message = "Validation failed",
+            Code = "Validation.Failed",
+            Details = ErrorDetailsBuilder.Create()
+                .AddDetail("Email", "Invalid format")
+                .Build()
+        };
+
+        Error error2 = new Error
+        {
+            Message = "Validation failed",
+            Code = "Validation.Failed",
+            Details = ErrorDetailsBuilder.Create()
+                .AddDetail("Email", "Already registered")
+                .Build()
+        };
+
+        Error aggregated = Error.Aggregate(new[] { error1, error2 });
+
+        Assert.NotNull(aggregated.Details);
+        Assert.Equal(2, aggregated.Details["Email"].Length);
+        Assert.Contains("Invalid format", aggregated.Details["Email"]);
+        Assert.Contains("Already registered", aggregated.Details["Email"]);
+    }
+
+    [Fact]
+    public void Aggregate_MixedErrorsWithAndWithoutDetails_ShouldOnlyMergeFromErrorsWithDetails()
+    {
+        Error validationError = new Error
+        {
+            Message = "Validation failed",
+            Code = "Validation.Failed",
+            Details = ErrorDetailsBuilder.Create()
+                .AddDetail("Email", "Invalid format")
+                .Build()
+        };
+
+        Error infrastructureError = Error.Create("Cache unavailable", "Cache.Miss");
+
+        Error aggregated = Error.Aggregate(new[] { validationError, infrastructureError });
+
+        Assert.NotNull(aggregated.Details);
+        Assert.Single(aggregated.Details);
+        Assert.True(aggregated.Details.ContainsKey("Email"));
+        // infrastructureError contributed nothing to Details
+        Assert.False(aggregated.Details.ContainsKey(""));
+    }
+
+    [Fact]
+    public void Aggregate_WithCustomMessage_WhenErrorsHaveDetails_ShouldMergeDetails()
+    {
+        Error error1 = new Error
+        {
+            Message = "Validation failed",
+            Code = "Validation.Failed",
+            Details = ErrorDetailsBuilder.Create()
+                .AddDetail("Email", "Invalid format")
+                .Build()
+        };
+
+        Error error2 = new Error
+        {
+            Message = "Validation failed",
+            Code = "Validation.Failed",
+            Details = ErrorDetailsBuilder.Create()
+                .AddDetail("Age", "Must be at least 18")
+                .Build()
+        };
+
+        Error aggregated = Error.Aggregate(new[] { error1, error2 }, "Multiple validation failures", "Validation.Failed");
+
+        Assert.NotNull(aggregated.Details);
+        Assert.True(aggregated.Details.ContainsKey("Email"));
+        Assert.True(aggregated.Details.ContainsKey("Age"));
+    }
 }
