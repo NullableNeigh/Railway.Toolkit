@@ -21,25 +21,22 @@ public static class ResultMapExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
         {
-            Result<TOut> output;
-
-            if (result is Result<TIn>.Ok ok)
-            {
-                TOut mapped = mapper(ok.Value);
-                RailwayLogging.Logger?.LogOperation("Map", "executed", timer.Elapsed);
-                output = new Result<TOut>.Ok(mapped);
-            }
-            else
-            {
-                Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
-                RailwayLogging.Logger?.LogOperation("Map", "skipped (on failure track)", timer.Elapsed);
-                output = new Result<TOut>.Fail(fail.Error);
-            }
-
-            return output;
+            output = new Result<TOut>.Ok(mapper(ok.Value));
         }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("Map", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -76,25 +73,23 @@ public static class ResultMapExtensions
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
         {
-            Result<TOut> output;
-
-            if (result is Result<TIn>.Ok ok)
-            {
-                TOut mapped = await mapper(ok.Value).ConfigureAwait(false);
-                RailwayLogging.Logger?.LogOperation("MapAsync", "executed", timer.Elapsed);
-                output = new Result<TOut>.Ok(mapped);
-            }
-            else
-            {
-                Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
-                RailwayLogging.Logger?.LogOperation("MapAsync", "skipped (on failure track)", timer.Elapsed);
-                output = new Result<TOut>.Fail(fail.Error);
-            }
-
-            return output;
+            TOut mapped = await mapper(ok.Value).ConfigureAwait(false);
+            output = new Result<TOut>.Ok(mapped);
         }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("MapAsync", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>

@@ -19,33 +19,30 @@ public static class ResultCombineExtensions
         this Result<T1> first,
         Result<T2> second)
     {
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
-        {
-            Result<(T1, T2)> output;
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-            if (first is Result<T1>.Ok ok1)
+        Result<(T1, T2)> output;
+
+        if (first is Result<T1>.Ok ok1)
+        {
+            if (second is Result<T2>.Ok ok2)
             {
-                if (second is Result<T2>.Ok ok2)
-                {
-                    RailwayLogging.Logger?.LogOperation("Zip", "both results succeeded", timer.Elapsed);
-                    output = new Result<(T1, T2)>.Ok((ok1.Value, ok2.Value));
-                }
-                else
-                {
-                    Result<T2>.Fail fail2 = (Result<T2>.Fail)second;
-                    RailwayLogging.Logger?.LogOperation("Zip", "second result failed", timer.Elapsed, fail2.Error);
-                    output = new Result<(T1, T2)>.Fail(fail2.Error);
-                }
+                output = new Result<(T1, T2)>.Ok((ok1.Value, ok2.Value));
             }
             else
             {
-                Result<T1>.Fail fail1 = (Result<T1>.Fail)first;
-                RailwayLogging.Logger?.LogOperation("Zip", "first result failed", timer.Elapsed, fail1.Error);
-                output = new Result<(T1, T2)>.Fail(fail1.Error);
+                Result<T2>.Fail fail2 = (Result<T2>.Fail)second;
+                output = new Result<(T1, T2)>.Fail(fail2.Error);
             }
-
-            return output;
         }
+        else
+        {
+            Result<T1>.Fail fail1 = (Result<T1>.Fail)first;
+            output = new Result<(T1, T2)>.Fail(fail1.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("Zip", first, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -147,32 +144,30 @@ public static class ResultCombineExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        // No single Result input — use Unit to represent "aggregate operation starting"
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        List<T> values = new List<T>();
+
+        foreach (Result<T> result in results)
         {
-            List<T> values = new List<T>();
-            int processedCount = 0;
-
-            foreach (Result<T> result in results)
+            if (result is Result<T>.Ok ok)
             {
-                (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
-                    ok => (true, ok.Value, null),
-                    fail => (false, default, fail.Error)
-                );
-
-                processedCount++;
-
-                if (!matched.isOk)
-                {
-                    RailwayLogging.Logger?.LogOperation("Combine", $"failed at result {processedCount}/{results.Length}", timer.Elapsed, matched.error);
-                    return matched.error!;
-                }
-
-                values.Add(matched.value!);
+                values.Add(ok.Value);
             }
-
-            RailwayLogging.Logger?.LogOperation("Combine", $"all {results.Length} result(s) succeeded", timer.Elapsed);
-            return values;
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                Result<IReadOnlyList<T>> failOutput = new Result<IReadOnlyList<T>>.Fail(fail.Error);
+                RailwayLogging.Logger?.LogOperation("Combine", input, failOutput, timer.GetElapsed());
+                return failOutput;
+            }
         }
+
+        Result<IReadOnlyList<T>> output = new Result<IReadOnlyList<T>>.Ok(values);
+        RailwayLogging.Logger?.LogOperation("Combine", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -183,32 +178,29 @@ public static class ResultCombineExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        List<T> values = new List<T>();
+
+        foreach (Result<T> result in results)
         {
-            List<T> values = new List<T>();
-            int processedCount = 0;
-
-            foreach (Result<T> result in results)
+            if (result is Result<T>.Ok ok)
             {
-                (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
-                    ok => (true, ok.Value, null),
-                    fail => (false, default, fail.Error)
-                );
-
-                processedCount++;
-
-                if (!matched.isOk)
-                {
-                    RailwayLogging.Logger?.LogOperation("Combine", $"failed at result {processedCount}", timer.Elapsed, matched.error);
-                    return matched.error!;
-                }
-
-                values.Add(matched.value!);
+                values.Add(ok.Value);
             }
-
-            RailwayLogging.Logger?.LogOperation("Combine", $"all {processedCount} result(s) succeeded", timer.Elapsed);
-            return values;
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                Result<IReadOnlyList<T>> failOutput = new Result<IReadOnlyList<T>>.Fail(fail.Error);
+                RailwayLogging.Logger?.LogOperation("Combine", input, failOutput, timer.GetElapsed());
+                return failOutput;
+            }
         }
+
+        Result<IReadOnlyList<T>> output = new Result<IReadOnlyList<T>>.Ok(values);
+        RailwayLogging.Logger?.LogOperation("Combine", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -233,6 +225,9 @@ public static class ResultCombineExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<T> values = new List<T>();
         List<Error> errors = new List<Error>();
 
@@ -249,12 +244,12 @@ public static class ResultCombineExtensions
             }
         }
 
-        if (errors.Count > 0)
-        {
-            return Error.Aggregate(errors);
-        }
+        Result<IReadOnlyList<T>> output = errors.Count > 0
+            ? new Result<IReadOnlyList<T>>.Fail(Error.Aggregate(errors))
+            : new Result<IReadOnlyList<T>>.Ok(values);
 
-        return values;
+        RailwayLogging.Logger?.LogOperation("CombineAll", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>

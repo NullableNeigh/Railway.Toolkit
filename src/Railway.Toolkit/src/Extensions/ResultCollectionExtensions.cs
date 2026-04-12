@@ -22,34 +22,31 @@ public static class ResultCollectionExtensions
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        List<TOut> results = new List<TOut>();
+
+        foreach (TIn? item in source)
         {
-            List<TOut> results = new List<TOut>();
-            int processedCount = 0;
+            Result<TOut> result = selector(item);
 
-            foreach (TIn? item in source)
+            if (result is Result<TOut>.Ok ok)
             {
-                Result<TOut> result = selector(item);
-
-                (bool isOk, TOut? value, Error? error) matched = result.Match<(bool isOk, TOut? value, Error? error)>(
-                    ok => (true, ok.Value, null),
-                    fail => (false, default, fail.Error)
-                );
-
-                processedCount++;
-
-                if (!matched.isOk)
-                {
-                    RailwayLogging.Logger?.LogOperation("Traverse", $"failed at element {processedCount}", timer.Elapsed, matched.error);
-                    return matched.error!;
-                }
-
-                results.Add(matched.value!);
+                results.Add(ok.Value);
             }
-
-            RailwayLogging.Logger?.LogOperation("Traverse", $"all {processedCount} element(s) succeeded", timer.Elapsed);
-            return results;
+            else
+            {
+                Result<TOut>.Fail fail = (Result<TOut>.Fail)result;
+                Result<IReadOnlyList<TOut>> failOutput = new Result<IReadOnlyList<TOut>>.Fail(fail.Error);
+                RailwayLogging.Logger?.LogOperation("Traverse", input, failOutput, timer.GetElapsed());
+                return failOutput;
+            }
         }
+
+        Result<IReadOnlyList<TOut>> output = new Result<IReadOnlyList<TOut>>.Ok(results);
+        RailwayLogging.Logger?.LogOperation("Traverse", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -68,36 +65,33 @@ public static class ResultCollectionExtensions
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        List<TOut> results = new List<TOut>();
+        List<Error> errors = new List<Error>();
+
+        foreach (TIn? item in source)
         {
-            List<TOut> results = new List<TOut>();
-            List<Error> errors = new List<Error>();
+            Result<TOut> result = selector(item);
 
-            foreach (TIn? item in source)
+            if (result is Result<TOut>.Ok ok)
             {
-                Result<TOut> result = selector(item);
-
-                if (result is Result<TOut>.Ok ok)
-                {
-                    results.Add(ok.Value);
-                }
-                else
-                {
-                    Result<TOut>.Fail fail = (Result<TOut>.Fail)result;
-                    errors.Add(fail.Error);
-                }
+                results.Add(ok.Value);
             }
-
-            if (errors.Count > 0)
+            else
             {
-                Error aggregateError = Error.Aggregate(errors); // Error.Aggregate already logs
-                RailwayLogging.Logger?.LogOperation("TraverseAll", $"failed with {errors.Count} error(s)", timer.Elapsed, aggregateError);
-                return aggregateError;
+                Result<TOut>.Fail fail = (Result<TOut>.Fail)result;
+                errors.Add(fail.Error);
             }
-
-            RailwayLogging.Logger?.LogOperation("TraverseAll", $"all {results.Count} element(s) succeeded", timer.Elapsed);
-            return results;
         }
+
+        Result<IReadOnlyList<TOut>> output = errors.Count > 0
+            ? new Result<IReadOnlyList<TOut>>.Fail(Error.Aggregate(errors))
+            : new Result<IReadOnlyList<TOut>>.Ok(results);
+
+        RailwayLogging.Logger?.LogOperation("TraverseAll", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -116,26 +110,31 @@ public static class ResultCollectionExtensions
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<TOut> results = new List<TOut>();
 
         foreach (TIn? item in source)
         {
             Result<TOut> result = await selector(item).ConfigureAwait(false);
 
-            (bool isOk, TOut? value, Error? error) matched = result.Match<(bool isOk, TOut? value, Error? error)>(
-                ok => (true, ok.Value, null),
-                fail => (false, default, fail.Error)
-            );
-
-            if (!matched.isOk)
+            if (result is Result<TOut>.Ok ok)
             {
-                return matched.error!;
+                results.Add(ok.Value);
             }
-
-            results.Add(matched.value!);
+            else
+            {
+                Result<TOut>.Fail fail = (Result<TOut>.Fail)result;
+                Result<IReadOnlyList<TOut>> failOutput = new Result<IReadOnlyList<TOut>>.Fail(fail.Error);
+                RailwayLogging.Logger?.LogOperation("TraverseAsync", input, failOutput, timer.GetElapsed());
+                return failOutput;
+            }
         }
 
-        return results;
+        Result<IReadOnlyList<TOut>> output = new Result<IReadOnlyList<TOut>>.Ok(results);
+        RailwayLogging.Logger?.LogOperation("TraverseAsync", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -154,6 +153,9 @@ public static class ResultCollectionExtensions
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<TOut> results = new List<TOut>();
         List<Error> errors = new List<Error>();
 
@@ -172,12 +174,12 @@ public static class ResultCollectionExtensions
             }
         }
 
-        if (errors.Count > 0)
-        {
-            return Error.Aggregate(errors);
-        }
+        Result<IReadOnlyList<TOut>> output = errors.Count > 0
+            ? new Result<IReadOnlyList<TOut>>.Fail(Error.Aggregate(errors))
+            : new Result<IReadOnlyList<TOut>>.Ok(results);
 
-        return results;
+        RailwayLogging.Logger?.LogOperation("TraverseAllAsync", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -195,17 +197,15 @@ public static class ResultCollectionExtensions
 
         foreach (Result<T> result in results)
         {
-            (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
-                ok => (true, ok.Value, null),
-                fail => (false, default, fail.Error)
-            );
-
-            if (!matched.isOk)
+            if (result is Result<T>.Ok ok)
             {
-                return matched.error!;
+                values.Add(ok.Value);
             }
-
-            values.Add(matched.value!);
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                return fail.Error;
+            }
         }
 
         return values;
@@ -264,17 +264,15 @@ public static class ResultCollectionExtensions
         {
             Result<T> result = await resultTask.ConfigureAwait(false);
 
-            (bool isOk, T? value, Error? error) matched = result.Match<(bool isOk, T? value, Error? error)>(
-                ok => (true, ok.Value, null),
-                fail => (false, default, fail.Error)
-            );
-
-            if (!matched.isOk)
+            if (result is Result<T>.Ok ok)
             {
-                return matched.error!;
+                values.Add(ok.Value);
             }
-
-            values.Add(matched.value!);
+            else
+            {
+                Result<T>.Fail fail = (Result<T>.Fail)result;
+                return fail.Error;
+            }
         }
 
         return values;

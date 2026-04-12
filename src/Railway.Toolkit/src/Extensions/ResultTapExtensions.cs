@@ -21,20 +21,15 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
-        {
-            if (result is Result<T>.Ok ok)
-            {
-                action(ok.Value);
-                RailwayLogging.Logger?.LogOperation("Tap", "executed", timer.Elapsed);
-            }
-            else
-            {
-                RailwayLogging.Logger?.LogOperation("Tap", "skipped (on failure track)", timer.Elapsed);
-            }
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-            return result;
+        if (result is Result<T>.Ok ok)
+        {
+            action(ok.Value);
         }
+
+        RailwayLogging.Logger?.LogOperation("Tap", result, result, timer.GetElapsed());
+        return result;
     }
 
     /// <summary>
@@ -52,20 +47,15 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
-        {
-            if (result is Result<T>.Fail fail)
-            {
-                action(fail.Error);
-                RailwayLogging.Logger?.LogOperation("TapError", "executed", timer.Elapsed, fail.Error);
-            }
-            else
-            {
-                RailwayLogging.Logger?.LogOperation("TapError", "skipped (on success track)", timer.Elapsed);
-            }
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-            return result;
+        if (result is Result<T>.Fail fail)
+        {
+            action(fail.Error);
         }
+
+        RailwayLogging.Logger?.LogOperation("TapError", result, result, timer.GetElapsed());
+        return result;
     }
 
     /// <summary>
@@ -98,11 +88,14 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
         if (result is Result<T>.Ok ok)
         {
             await action(ok.Value).ConfigureAwait(false);
         }
 
+        RailwayLogging.Logger?.LogOperation("TapAsync", result, result, timer.GetElapsed());
         return result;
     }
 
@@ -153,11 +146,14 @@ public static class ResultTapExtensions
     {
         ArgumentNullException.ThrowIfNull(action);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
         if (result is Result<T>.Fail fail)
         {
             await action(fail.Error).ConfigureAwait(false);
         }
 
+        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, result, timer.GetElapsed());
         return result;
     }
 

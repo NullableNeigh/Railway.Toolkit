@@ -22,35 +22,22 @@ public static class ResultBindExtensions
     {
         ArgumentNullException.ThrowIfNull(binder);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
         {
-            Result<TOut> output;
-
-            if (result is Result<TIn>.Ok ok)
-            {
-                Result<TOut> bound = binder(ok.Value);
-
-                if (bound is Result<TOut>.Ok)
-                {
-                    RailwayLogging.Logger?.LogOperation("Bind", "executed (stayed on success track)", timer.Elapsed);
-                }
-                else
-                {
-                    Result<TOut>.Fail failBound = (Result<TOut>.Fail)bound;
-                    RailwayLogging.Logger?.LogOperation("Bind", "failed (switched to failure track)", timer.Elapsed, failBound.Error);
-                }
-
-                output = bound;
-            }
-            else
-            {
-                Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
-                RailwayLogging.Logger?.LogOperation("Bind", "skipped (on failure track)", timer.Elapsed);
-                output = new Result<TOut>.Fail(fail.Error);
-            }
-
-            return output;
+            output = binder(ok.Value);
         }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("Bind", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -85,35 +72,22 @@ public static class ResultBindExtensions
     {
         ArgumentNullException.ThrowIfNull(binder);
 
-        using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
         {
-            Result<TOut> output;
-
-            if (result is Result<TIn>.Ok ok)
-            {
-                Result<TOut> bound = await binder(ok.Value).ConfigureAwait(false);
-
-                if (bound is Result<TOut>.Ok)
-                {
-                    RailwayLogging.Logger?.LogOperation("BindAsync", "executed (stayed on success track)", timer.Elapsed);
-                }
-                else
-                {
-                    Result<TOut>.Fail failBound = (Result<TOut>.Fail)bound;
-                    RailwayLogging.Logger?.LogOperation("BindAsync", "failed (switched to failure track)", timer.Elapsed, failBound.Error);
-                }
-
-                output = bound;
-            }
-            else
-            {
-                Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
-                RailwayLogging.Logger?.LogOperation("BindAsync", "skipped (on failure track)", timer.Elapsed);
-                output = new Result<TOut>.Fail(fail.Error);
-            }
-
-            return output;
+            output = await binder(ok.Value).ConfigureAwait(false);
         }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("BindAsync", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>

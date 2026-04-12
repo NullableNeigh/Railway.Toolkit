@@ -70,36 +70,27 @@ namespace Railway.Toolkit
         /// <returns>An aggregate error containing all the individual errors.</returns>
         public static Error Aggregate(IEnumerable<Error> errors, string code = "AggregateError")
         {
-            using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+            List<Error> errorList = errors.ToList();
+
+            if (errorList.Count == 0)
             {
-                List<Error> errorList = errors.ToList();
-
-                if (errorList.Count == 0)
-                {
-                    throw new ArgumentException("Cannot create aggregate error from empty collection", nameof(errors));
-                }
-
-                if (errorList.Count == 1)
-                {
-                    RailwayLogging.Logger?.LogOperation("Error.Aggregate", "single error (returning as-is)", timer.Elapsed, errorList[0]);
-                    return errorList[0];
-                }
-
-                string message = $"{errorList.Count} errors occurred: {string.Join("; ", errorList.Select(e => e.Message))}";
-
-                IReadOnlyDictionary<string, string[]>? mergedDetails = MergeDetails(errorList);
-
-                Error aggregatedError = new Error
-                {
-                    Message = message,
-                    Code = code,
-                    InnerErrors = errorList,
-                    Details = mergedDetails
-                };
-
-                RailwayLogging.Logger?.LogOperation("Error.Aggregate", $"combined {errorList.Count} errors", timer.Elapsed, aggregatedError);
-                return aggregatedError;
+                throw new ArgumentException("Cannot create aggregate error from empty collection", nameof(errors));
             }
+
+            if (errorList.Count == 1)
+            {
+                return errorList[0];
+            }
+
+            string message = $"{errorList.Count} errors occurred: {string.Join("; ", errorList.Select(e => e.Message))}";
+
+            return new Error
+            {
+                Message = message,
+                Code = code,
+                InnerErrors = errorList,
+                Details = MergeDetails(errorList)
+            };
         }
 
         /// <summary>
@@ -111,28 +102,20 @@ namespace Railway.Toolkit
         /// <returns>An aggregate error containing all the individual errors.</returns>
         public static Error Aggregate(IEnumerable<Error> errors, string message, string code)
         {
-            using (OperationTimer timer = new OperationTimer(RailwayLogging.Options.TimingStrategy))
+            List<Error> errorList = errors.ToList();
+
+            if (errorList.Count == 0)
             {
-                List<Error> errorList = errors.ToList();
-
-                if (errorList.Count == 0)
-                {
-                    throw new ArgumentException("Cannot create aggregate error from empty collection", nameof(errors));
-                }
-
-                IReadOnlyDictionary<string, string[]>? mergedDetails = MergeDetails(errorList);
-
-                Error aggregatedError = new Error
-                {
-                    Message = message,
-                    Code = code,
-                    InnerErrors = errorList,
-                    Details = mergedDetails
-                };
-
-                RailwayLogging.Logger?.LogOperation("Error.Aggregate", $"combined {errorList.Count} errors with custom message", timer.Elapsed, aggregatedError);
-                return aggregatedError;
+                throw new ArgumentException("Cannot create aggregate error from empty collection", nameof(errors));
             }
+
+            return new Error
+            {
+                Message = message,
+                Code = code,
+                InnerErrors = errorList,
+                Details = MergeDetails(errorList)
+            };
         }
 
         /// <summary>
