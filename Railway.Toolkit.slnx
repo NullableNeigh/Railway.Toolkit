@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="src/Railway.Toolkit/Railway.Toolkit.csproj" />
+  <Project Path="src/Railway.Toolkit.Tests/Railway.Toolkit.Tests.csproj" />
+</Solution>
