@@ -21,6 +21,8 @@ namespace Railway.Toolkit
         public Exception? Exception { get; init; }
 
         /// <summary>
+        /// Gets the collection of inner errors if this is an aggregate error.
+        /// Used when combining multiple validation failures.
         /// Gets structured field-level validation details, mapping field names to their error messages.
         /// Use this for form/API validation where errors need to be associated with specific fields.
         /// Example: { "Email": ["Invalid format", "Already exists"], "Age": ["Must be >= 18"] }
