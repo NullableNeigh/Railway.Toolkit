@@ -1,5 +1,9 @@
 # Railway.Toolkit
 
+<p align="center">
+  <img src="docs/logo.png" alt="Railway Toolkit" width="200" />
+</p>
+
 [![.NET](https://img.shields.io/badge/.NET-8.0-purple)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-166%20passing-brightgreen)](src/Railway.Toolkit.Tests)
