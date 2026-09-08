@@ -2,17 +2,17 @@ namespace Railway.Toolkit;
 
 /// <summary>
 /// Extension methods for wrapping exception-throwing code into Results.
-/// Try operations convert imperative exception-based code into functional Result-based code.
+/// Try operations convert non-cancellation exceptions into functional Result-based code.
 /// </summary>
 public static class ResultTryExtensions
 {
     /// <summary>
-    /// Executes a function and catches any exceptions, converting them to a Result.
+    /// Executes a function and converts non-cancellation exceptions to a Result.
     /// </summary>
     /// <typeparam name="T">The return type of the function.</typeparam>
     /// <param name="func">The function to execute.</param>
-    /// <param name="errorCode">Optional error code to use when an exception is caught.</param>
-    /// <returns>Ok with the function result, or Fail with the exception converted to an Error.</returns>
+    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
+    /// <returns>Ok with the function result, or Fail with a non-cancellation exception converted to an Error.</returns>
     public static Result<T> Try<T>(
         Func<T> func,
         string? errorCode = null)
@@ -29,7 +29,7 @@ public static class ResultTryExtensions
         {
             output = new Result<T>.Ok(func());
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             output = new Result<T>.Fail(Error.FromException(ex, errorCode));
         }
@@ -39,12 +39,12 @@ public static class ResultTryExtensions
     }
 
     /// <summary>
-    /// Executes an asynchronous function and catches any exceptions, converting them to a Result.
+    /// Executes an asynchronous function and converts non-cancellation exceptions to a Result.
     /// </summary>
     /// <typeparam name="T">The return type of the function.</typeparam>
     /// <param name="func">The async function to execute.</param>
-    /// <param name="errorCode">Optional error code to use when an exception is caught.</param>
-    /// <returns>A task containing Ok with the function result, or Fail with the exception.</returns>
+    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
+    /// <returns>A task containing Ok with the function result, or Fail with a non-cancellation exception.</returns>
     public static async Task<Result<T>> TryAsync<T>(
         Func<Task<T>> func,
         string? errorCode = null)
@@ -60,7 +60,7 @@ public static class ResultTryExtensions
         {
             output = new Result<T>.Ok(await func().ConfigureAwait(false));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             output = new Result<T>.Fail(Error.FromException(ex, errorCode));
         }
@@ -73,8 +73,8 @@ public static class ResultTryExtensions
     /// Wraps an action in a Result, returning Unit on success.
     /// </summary>
     /// <param name="action">The action to execute.</param>
-    /// <param name="errorCode">Optional error code to use when an exception is caught.</param>
-    /// <returns>Ok with Unit if successful, or Fail with the exception converted to an Error.</returns>
+    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
+    /// <returns>Ok with Unit if successful, or Fail with a non-cancellation exception converted to an Error.</returns>
     public static Result<Unit> Try(
         Action action,
         string? errorCode = null)
@@ -91,7 +91,7 @@ public static class ResultTryExtensions
             action();
             output = new Result<Unit>.Ok(Unit.Value);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             output = new Result<Unit>.Fail(Error.FromException(ex, errorCode));
         }
@@ -104,8 +104,8 @@ public static class ResultTryExtensions
     /// Wraps an asynchronous action in a Result, returning Unit on success.
     /// </summary>
     /// <param name="action">The async action to execute.</param>
-    /// <param name="errorCode">Optional error code to use when an exception is caught.</param>
-    /// <returns>A task containing Ok with Unit if successful, or Fail with the exception.</returns>
+    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
+    /// <returns>A task containing Ok with Unit if successful, or Fail with a non-cancellation exception.</returns>
     public static async Task<Result<Unit>> TryAsync(
         Func<Task> action,
         string? errorCode = null)
@@ -122,7 +122,7 @@ public static class ResultTryExtensions
             await action().ConfigureAwait(false);
             output = new Result<Unit>.Ok(Unit.Value);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             output = new Result<Unit>.Fail(Error.FromException(ex, errorCode));
         }
@@ -132,15 +132,15 @@ public static class ResultTryExtensions
     }
 
     /// <summary>
-    /// Applies a function to the success value and catches any exceptions.
+    /// Applies a function to the success value and converts non-cancellation exceptions to failures.
     /// Combines Map with exception handling.
     /// </summary>
     /// <typeparam name="TIn">The input value type.</typeparam>
     /// <typeparam name="TOut">The output value type.</typeparam>
     /// <param name="result">The result to map.</param>
     /// <param name="mapper">The function to apply to the success value.</param>
-    /// <param name="errorCode">Optional error code to use when an exception is caught.</param>
-    /// <returns>Ok with the mapped value, or Fail with the error or exception.</returns>
+    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
+    /// <returns>Ok with the mapped value, or Fail with the error or a non-cancellation exception.</returns>
     public static Result<TOut> TryMap<TIn, TOut>(
         this Result<TIn> result,
         Func<TIn, TOut> mapper,
@@ -158,7 +158,7 @@ public static class ResultTryExtensions
             {
                 output = new Result<TOut>.Ok(mapper(ok.Value));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
             }
@@ -174,14 +174,14 @@ public static class ResultTryExtensions
     }
 
     /// <summary>
-    /// Applies an asynchronous function to the success value and catches any exceptions.
+    /// Applies an asynchronous function to the success value and converts non-cancellation exceptions to failures.
     /// </summary>
     /// <typeparam name="TIn">The input value type.</typeparam>
     /// <typeparam name="TOut">The output value type.</typeparam>
     /// <param name="result">The result to map.</param>
     /// <param name="mapper">The async function to apply to the success value.</param>
-    /// <param name="errorCode">Optional error code to use when an exception is caught.</param>
-    /// <returns>A task containing Ok with the mapped value, or Fail with the error or exception.</returns>
+    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
+    /// <returns>A task containing Ok with the mapped value, or Fail with the error or a non-cancellation exception.</returns>
     public static async Task<Result<TOut>> TryMapAsync<TIn, TOut>(
         this Result<TIn> result,
         Func<TIn, Task<TOut>> mapper,
@@ -199,7 +199,7 @@ public static class ResultTryExtensions
             {
                 output = new Result<TOut>.Ok(await mapper(ok.Value).ConfigureAwait(false));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
             }
@@ -215,15 +215,15 @@ public static class ResultTryExtensions
     }
 
     /// <summary>
-    /// Applies a binder function to the success value and catches any exceptions.
+    /// Applies a binder function to the success value and converts non-cancellation exceptions to failures.
     /// Combines Bind with exception handling.
     /// </summary>
     /// <typeparam name="TIn">The input value type.</typeparam>
     /// <typeparam name="TOut">The output value type.</typeparam>
     /// <param name="result">The result to bind.</param>
     /// <param name="binder">The function that returns a new Result.</param>
-    /// <param name="errorCode">Optional error code to use when an exception is caught.</param>
-    /// <returns>The result of the binder, or Fail with the error or exception.</returns>
+    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
+    /// <returns>The result of the binder, or Fail with the error or a non-cancellation exception.</returns>
     public static Result<TOut> TryBind<TIn, TOut>(
         this Result<TIn> result,
         Func<TIn, Result<TOut>> binder,
@@ -241,7 +241,7 @@ public static class ResultTryExtensions
             {
                 output = binder(ok.Value);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
             }
@@ -257,14 +257,14 @@ public static class ResultTryExtensions
     }
 
     /// <summary>
-    /// Applies an asynchronous binder function to the success value and catches any exceptions.
+    /// Applies an asynchronous binder function to the success value and converts non-cancellation exceptions to failures.
     /// </summary>
     /// <typeparam name="TIn">The input value type.</typeparam>
     /// <typeparam name="TOut">The output value type.</typeparam>
     /// <param name="result">The result to bind.</param>
     /// <param name="binder">The async function that returns a new Result.</param>
-    /// <param name="errorCode">Optional error code to use when an exception is caught.</param>
-    /// <returns>A task containing the result of the binder, or Fail with the error or exception.</returns>
+    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
+    /// <returns>A task containing the result of the binder, or Fail with the error or a non-cancellation exception.</returns>
     public static async Task<Result<TOut>> TryBindAsync<TIn, TOut>(
         this Result<TIn> result,
         Func<TIn, Task<Result<TOut>>> binder,
@@ -282,7 +282,7 @@ public static class ResultTryExtensions
             {
                 output = await binder(ok.Value).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
             }
