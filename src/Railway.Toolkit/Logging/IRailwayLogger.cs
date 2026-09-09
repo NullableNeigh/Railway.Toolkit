@@ -8,6 +8,11 @@ namespace Railway.Toolkit;
 internal interface IRailwayLogger
 {
     /// <summary>
+    /// Starts timing an operation when this logger can emit Railway events.
+    /// </summary>
+    IRailwayTimer StartOperation();
+
+    /// <summary>
     /// Logs a railway operation with its full input/output context.
     /// </summary>
     /// <typeparam name="TIn">The input value type.</typeparam>
