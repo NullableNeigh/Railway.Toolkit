@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using Railway.Toolkit;
 
 namespace Railway.Toolkit.Tests;
@@ -321,7 +320,7 @@ public class CancellationSemanticsTests
     [Fact]
     public async Task Cancellation_ProducesNoRailwayOperationLog()
     {
-        CountingLogger logger = new CountingLogger();
+        InMemoryLogger logger = new InMemoryLogger();
         RailwayLoggingOptions options = new RailwayLoggingOptions
         {
             Enabled = true,
@@ -332,44 +331,13 @@ public class CancellationSemanticsTests
 
         Result<int> successfulResult = ResultTryExtensions.Try(() => 42);
         Assert.IsType<Result<int>.Ok>(successfulResult);
-        Assert.Equal(1, logger.EntryCount);
-        logger.Reset();
+        Assert.Single(logger.Entries);
+        logger.Clear();
 
         Task<Result<int>> cancelledOperation = ResultTryExtensions.TryAsync<int>(
             () => throw new OperationCanceledException());
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelledOperation);
-        Assert.Equal(0, logger.EntryCount);
-    }
-
-    private sealed class CountingLogger : ILogger
-    {
-        public int EntryCount { get; private set; }
-
-        public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
-
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
-
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception? exception,
-            Func<TState, Exception?, string> formatter)
-        {
-            EntryCount++;
-        }
-
-        public void Reset()
-        {
-            EntryCount = 0;
-        }
+        Assert.Empty(logger.Entries);
     }
 }

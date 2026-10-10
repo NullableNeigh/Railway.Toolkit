@@ -69,7 +69,7 @@ public static class RailwayLogging
     /// </summary>
     internal static IRailwayTimer StartOperation()
     {
-        return RailwayTimerFactory.Create(Options);
+        return Logger?.StartOperation() ?? NullRailwayTimer.Instance;
     }
 
     /// <summary>
