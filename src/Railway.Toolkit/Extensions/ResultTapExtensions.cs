@@ -326,4 +326,62 @@ public static class ResultTapExtensions
         Result<T> result = await resultTask.ConfigureAwait(false);
         return await result.FinallyAsync(action).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Executes an asynchronous action on the success value without modifying the result.
+    /// </summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="result">The result to tap into.</param>
+    /// <param name="action">The async action to execute on the success value.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <returns>A task containing the original result unchanged.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
+    /// <remarks>Argument validation precedes cancellation.
+    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Every OperationCanceledException propagates.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<T>> TapAsync<T>(
+        this Result<T> result,
+        Func<T, CancellationToken, Task> action,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        if (result is Result<T>.Ok ok)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await action(ok.Value, cancellationToken).ConfigureAwait(false);
+        }
+
+        RailwayLogging.Logger?.LogOperation("TapAsync", result, result, timer.GetElapsed());
+        return result;
+    }
+
+    /// <summary>
+    /// Executes an asynchronous action on the success value of an async result without modifying it.
+    /// </summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="resultTask">The task containing the result to tap into.</param>
+    /// <param name="action">The async action to execute on the success value.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <returns>A task containing the original result unchanged.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
+    /// <remarks>Argument validation precedes cancellation. Incoming result tasks are awaited normally.
+    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Every OperationCanceledException propagates.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<T>> TapAsync<T>(
+        this Task<Result<T>> resultTask,
+        Func<T, CancellationToken, Task> action,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        Result<T> result = await resultTask.ConfigureAwait(false);
+        return await result.TapAsync(action, cancellationToken).ConfigureAwait(false);
+    }
 }

@@ -223,6 +223,71 @@ await ResultTryExtensions.TryAsync(async () =>
 });
 ```
 
+### Cancellation
+
+The asynchronous-delegate overloads of `BindAsync`, `MapAsync`, `EnsureAsync`, and
+`TapAsync` accept a required `CancellationToken` on both `Result<T>` and
+`Task<Result<T>>`. `TryAsync` (functions and actions), `TryMapAsync`, `TryBindAsync`,
+`TraverseAsync`, and `TraverseAllAsync` also accept token-aware delegates. The
+delegate receives the exact governing token as its final argument. Return types
+remain `Task`.
+
+```csharp
+Task<int> FetchAsync(int id, CancellationToken token) =>
+    Task.FromResult(id + 1);
+
+Task<Result<int>> SaveAsync(int value, CancellationToken token) =>
+    Task.FromResult(Result.Ok(value));
+
+Result<int> result = await Result.Ok(1)
+    .MapAsync(FetchAsync, cancellationToken)
+    .BindAsync(SaveAsync, cancellationToken)
+    .EnsureAsync((value, token) => Task.FromResult(value > 0),
+        Error.Create("Value must be positive", "Validation.Positive"), cancellationToken)
+    .TapAsync((value, token) => Task.CompletedTask, cancellationToken);
+
+Result<string> text = await ResultTryExtensions.TryAsync(
+    token => httpClient.GetStringAsync(url, token), cancellationToken, "Http.Fetch");
+```
+
+Supply the token after the delegate and required operation arguments. For Try
+methods it precedes the optional `errorCode`. Explicit `default` or
+`CancellationToken.None` is supported; the token parameter is never optional.
+
+Argument validation runs first. On a successful input, the library checks the
+token immediately before invoking the delegate. An existing failure preserves its
+error and skips the delegate without observing cancellation. Incoming
+`Task<Result<T>>` values are awaited normally, even if the governing token is
+cancelled while waiting; the result's track then determines whether to observe it.
+Delegates remain responsible for observing cancellation while running. A delegate
+that ignores it can complete successfully, and completed side effects are not
+rolled back.
+
+Traversal is sequential. It checks cancellation before obtaining the enumerator,
+before each `MoveNext` (including for empty sources), and again before invoking
+the selector. Cancellation stops traversal without returning collected values or
+errors. `TraverseAllAsync` still collects ordinary failures, but cancellation
+propagates.
+
+Non-Try methods propagate every `OperationCanceledException`. Token-aware Try
+methods propagate it when the governing token is requested at the catch boundary;
+otherwise they convert it through `Error.FromException`, retaining the exception
+and supplied error code. Exception-token identity is not compared. This includes
+linked and unrelated tokens: the governing token's state decides. An unrequested
+`TaskCanceledException`, such as a timeout, becomes a failure. With `default` or
+`CancellationToken.None`, every cancellation exception at a Try boundary becomes
+a failure. Ordinary exceptions retain the existing Try conversion behaviour.
+
+Propagated cancellation emits no Railway operation log. Converted Try failures
+use normal failure logging. Existing tokenless overloads remain supported and
+continue to propagate every `OperationCanceledException`, including in Try methods.
+Choosing a token-aware Try overload therefore intentionally changes unrequested
+cancellation into a failure.
+
+Token overloads are limited to the operations above. They are not provided for
+failure-track operations, `FinallyAsync`, `MatchAsync`, already-started-task
+collection operations, or synchronous delegates.
+
 ### Recover - Error Recovery
 
 Return to success track after error:

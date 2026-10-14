@@ -107,4 +107,71 @@ public static class ResultBindExtensions
         Result<TIn> result = await resultTask.ConfigureAwait(false);
         return await result.BindAsync(binder).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Chains an asynchronous operation that returns a Result.
+    /// </summary>
+    /// <typeparam name="TIn">The input value type.</typeparam>
+    /// <typeparam name="TOut">The output value type.</typeparam>
+    /// <param name="result">The result to bind.</param>
+    /// <param name="binder">The async function that returns a new Result.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <returns>A task containing the bound result.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
+    /// <remarks>Argument validation precedes cancellation.
+    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Every OperationCanceledException propagates.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<TOut>> BindAsync<TIn, TOut>(
+        this Result<TIn> result,
+        Func<TIn, CancellationToken, Task<Result<TOut>>> binder,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(binder);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            output = await binder(ok.Value, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("BindAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>
+    /// Chains an asynchronous operation that returns a Result on an async result.
+    /// </summary>
+    /// <typeparam name="TIn">The input value type.</typeparam>
+    /// <typeparam name="TOut">The output value type.</typeparam>
+    /// <param name="resultTask">The task containing the result to bind.</param>
+    /// <param name="binder">The async function that returns a new Result.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <returns>A task containing the bound result.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
+    /// <remarks>Argument validation precedes cancellation. Incoming result tasks are awaited normally.
+    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Every OperationCanceledException propagates.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<TOut>> BindAsync<TIn, TOut>(
+        this Task<Result<TIn>> resultTask,
+        Func<TIn, CancellationToken, Task<Result<TOut>>> binder,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(binder);
+
+        Result<TIn> result = await resultTask.ConfigureAwait(false);
+        return await result.BindAsync(binder, cancellationToken).ConfigureAwait(false);
+    }
 }
