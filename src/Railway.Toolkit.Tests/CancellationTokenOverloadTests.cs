@@ -64,9 +64,15 @@ public class CancellationTokenOverloadTests
 
     [Theory]
     [MemberData(nameof(SuccessOperations))]
-    public async Task CancelledFailure_PreservesErrorWithoutInvokingDelegate(string operation)
+    public async Task CancelledFailure_DirectInputPreservesErrorButAwaitedInputCancels(string operation)
     {
         int calls = 0;
+        if (operation.StartsWith("Task", StringComparison.Ordinal))
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => RunSuccess(operation,
+                Result.Fail<int>(TestError), new CancellationToken(true), _ => throw new InvalidOperationException()));
+            return;
+        }
         Result<int> output = await RunSuccess(operation, Result.Fail<int>(TestError), new CancellationToken(true), _ =>
         {
             calls++;
@@ -79,16 +85,16 @@ public class CancellationTokenOverloadTests
 
     [Theory]
     [MemberData(nameof(SuccessOperations))]
-    public async Task DelegateIgnoringCancellation_CanCompleteSingleOperation(string operation)
+    public async Task DelegateIgnoringCancellation_CannotReturnResult(string operation)
     {
         using CancellationTokenSource source = new CancellationTokenSource();
-        Result<int> output = await RunSuccess(operation, Result.Ok(42), source.Token, _ =>
+        Task<Result<int>> pending = RunSuccess(operation, Result.Ok(42), source.Token, _ =>
         {
             source.Cancel();
             return Task.CompletedTask;
         });
 
-        Assert.Equal(42, Assert.IsType<Result<int>.Ok>(output).Value);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
     }
 
     [Theory]
@@ -100,7 +106,7 @@ public class CancellationTokenOverloadTests
     [InlineData("TaskEnsure", true)]
     [InlineData("TaskTap", false)]
     [InlineData("TaskTap", true)]
-    public async Task IncomingTask_CancellationWaitsForResultThenUsesTrack(string operation, bool failure)
+    public async Task IncomingTask_CancellationWaitsForResultThenWinsOverEitherTrack(string operation, bool failure)
     {
         using CancellationTokenSource source = new CancellationTokenSource();
         TaskCompletionSource<Result<int>> incoming = new TaskCompletionSource<Result<int>>();
@@ -115,14 +121,7 @@ public class CancellationTokenOverloadTests
         Assert.False(pending.IsCompleted);
         incoming.SetResult(failure ? Result.Fail<int>(TestError) : Result.Ok(42));
 
-        if (failure)
-        {
-            Assert.Same(TestError, Assert.IsType<Result<int>.Fail>(await pending).Error);
-        }
-        else
-        {
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
-        }
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
 
         Assert.Equal(0, calls);
     }
@@ -165,6 +164,36 @@ public class CancellationTokenOverloadTests
             return Task.CompletedTask;
         }));
         Assert.Equal(1, calls);
+    }
+
+    [Theory]
+    [MemberData(nameof(TryOperations))]
+    public async Task Try_NormalCompletionAfterCancellationProducesNoResultOrLog(string operation)
+    {
+        using CancellationTokenSource source = new CancellationTokenSource();
+        InMemoryLogger logger = new InMemoryLogger();
+        using IDisposable scope = RailwayLogging.EnableLogging(logger, LoggingOptions());
+        TaskCompletionSource work = new TaskCompletionSource();
+        Task pending = RunTry(operation, source.Token, _ => work.Task);
+        source.Cancel();
+        Assert.False(pending.IsCompleted);
+        work.SetResult();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+        Assert.Empty(logger.Entries);
+    }
+
+    [Theory]
+    [MemberData(nameof(NonTryOperations))]
+    public async Task Delegate_NormalAwaitIsNotAbandonedAndFaultStillPropagates(string operation)
+    {
+        using CancellationTokenSource source = new CancellationTokenSource();
+        TaskCompletionSource work = new TaskCompletionSource();
+        Task pending = RunSuccess(operation, Result.Ok(42), source.Token, _ => work.Task);
+        source.Cancel();
+        Assert.False(pending.IsCompleted);
+        InvalidOperationException expected = new InvalidOperationException("delegate fault");
+        work.SetException(expected);
+        Assert.Same(expected, await Record.ExceptionAsync(() => pending));
     }
 
     [Theory]
@@ -514,7 +543,9 @@ public class CancellationTokenOverloadTests
         {
             ["BindAsync"] = 2, ["MapAsync"] = 2, ["EnsureAsync"] = 2, ["TapAsync"] = 2,
             ["TryAsync"] = 2, ["TryMapAsync"] = 1, ["TryBindAsync"] = 1,
-            ["TraverseAsync"] = 1, ["TraverseAllAsync"] = 1
+            ["TraverseAsync"] = 1, ["TraverseAllAsync"] = 1,
+            ["SequenceAsync"] = 1, ["SequenceAllAsync"] = 1,
+            ["CombineAsync"] = 1, ["CombineAllAsync"] = 1, ["ZipAsync"] = 2
         };
         Dictionary<string, int> actual = new Dictionary<string, int>();
         foreach (Type type in typeof(Result<>).Assembly.GetExportedTypes())
@@ -534,6 +565,11 @@ public class CancellationTokenOverloadTests
                 {
                     Assert.Equal("errorCode", parameters[index + 1].Name);
                     Assert.True(parameters[index + 1].IsOptional);
+                }
+                else if (method.Name is "CombineAsync" or "CombineAllAsync")
+                {
+                    Assert.Equal(0, index);
+                    Assert.True(Attribute.IsDefined(parameters[1], typeof(ParamArrayAttribute)));
                 }
                 else
                 {

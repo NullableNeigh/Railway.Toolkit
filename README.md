@@ -254,20 +254,55 @@ Supply the token after the delegate and required operation arguments. For Try
 methods it precedes the optional `errorCode`. Explicit `default` or
 `CancellationToken.None` is supported; the token parameter is never optional.
 
-Argument validation runs first. On a successful input, the library checks the
-token immediately before invoking the delegate. An existing failure preserves its
-error and skips the delegate without observing cancellation. Incoming
-`Task<Result<T>>` values are awaited normally, even if the governing token is
-cancelled while waiting; the result's track then determines whether to observe it.
-Delegates remain responsible for observing cancellation while running. A delegate
-that ignores it can complete successfully, and completed side effects are not
-rolled back.
+Argument validation runs first. On a successful input, Railway checks the token
+before invoking the delegate and forwards it unchanged. A directly supplied
+`Result.Fail` skips success-track work without checking cancellation. Incoming
+result tasks are awaited normally, then cancellation is checked before processing
+either `Ok` or `Fail`. After normal delegate completion, Railway checks again
+before processing the result or creating output from a value, Boolean, or void
+completion. Work that ignores cancellation is awaited to completion; requested
+cancellation then prevents output. Completed side effects are not rolled back.
 
-Traversal is sequential. It checks cancellation before obtaining the enumerator,
-before each `MoveNext` (including for empty sources), and again before invoking
-the selector. Cancellation stops traversal without returning collected values or
-errors. `TraverseAllAsync` still collects ordinary failures, but cancellation
-propagates.
+Traversal checks before obtaining the enumerator, before each `MoveNext`, before
+the selector, after each normal selector await, and after enumeration and disposal.
+Cancellation returns no collected values or errors, including on the last item.
+`TraverseAllAsync` retains ordinary error aggregation.
+
+`SequenceAsync` and `SequenceAllAsync` accept a required token after their task
+enumerable. They check before obtaining the enumerator and each `MoveNext`.
+Lazy enumeration can start a task: every yielded task is awaited normally even
+if enumeration requested cancellation, then cancellation is checked before either
+result track is processed. A final check follows enumeration and disposal.
+
+`CombineAsync` and `CombineAllAsync` take the token before their `params` tasks:
+
+```csharp
+Task<Result<int>> first = LoadAsync(1, cancellationToken);
+Task<Result<int>> second = LoadAsync(2, cancellationToken);
+Result<IReadOnlyList<int>> combined = await ResultCombineExtensions.CombineAsync(
+    cancellationToken, first, second);
+Result<int> sum = await first.ZipAsync(second,
+    (a, b, token) => a + b, cancellationToken);
+```
+
+Combine checks cancellation before awaiting `Task.WhenAll`, awaits every supplied
+task normally, and checks again before combining the returned results. Ordinary
+faults retain `Task.WhenAll` behaviour. The `All` forms collect railway errors;
+the other forms return the first railway error in input order.
+
+Zip accepts the token after its second task, or after its synchronous selector.
+It awaits the first task normally and checks cancellation before advancing to
+the second await, then checks again before result processing. This also means a
+pre-cancelled token does not abandon the first await. The selector runs only for
+two successful inputs, receives the same token, and has checks before invocation
+and after normal return. Its exceptions propagate.
+
+Pass the governing token when creating supplied tasks. Railway cannot add work
+cancellation to a task after creation. Sequence stops enumeration when it stops;
+Zip may stop before awaiting its second task. The caller owns already-started
+siblings not reached, including observing their later faults. Combine awaits all
+siblings through `WhenAll`. No operation cancels only the wait, forcibly stops
+work, or returns a partial result on cancellation. Required disposal still runs.
 
 Non-Try methods propagate every `OperationCanceledException`. Token-aware Try
 methods propagate it when the governing token is requested at the catch boundary;
@@ -276,7 +311,9 @@ and supplied error code. Exception-token identity is not compared. This includes
 linked and unrelated tokens: the governing token's state decides. An unrequested
 `TaskCanceledException`, such as a timeout, becomes a failure. With `default` or
 `CancellationToken.None`, every cancellation exception at a Try boundary becomes
-a failure. Ordinary exceptions retain the existing Try conversion behaviour.
+a failure. Ordinary exceptions retain the existing Try conversion behaviour,
+even when the governing token is requested. The post-await check applies only to
+normal completion; it does not overwrite a converted exception with cancellation.
 
 Propagated cancellation emits no Railway operation log. Converted Try failures
 use normal failure logging. Existing tokenless overloads remain supported and
@@ -285,8 +322,8 @@ Choosing a token-aware Try overload therefore intentionally changes unrequested
 cancellation into a failure.
 
 Token overloads are limited to the operations above. They are not provided for
-failure-track operations, `FinallyAsync`, `MatchAsync`, already-started-task
-collection operations, or synchronous delegates.
+failure-track operations, `FinallyAsync`, `MatchAsync`, or other synchronous
+delegates beyond the Zip selector above.
 
 ### Recover - Error Recovery
 

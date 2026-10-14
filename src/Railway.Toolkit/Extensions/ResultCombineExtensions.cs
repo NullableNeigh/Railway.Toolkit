@@ -274,4 +274,124 @@ public static class ResultCombineExtensions
         Result<T>[] results = await Task.WhenAll(resultTasks).ConfigureAwait(false);
         return CombineAll(results);
     }
+
+    /// <summary>Awaits all supplied tasks, then combines their results with cancellation precedence.</summary>
+    /// <param name="cancellationToken">The required governing token, supplied when creating the underlying work.</param>
+    /// <param name="resultTasks">Already-started tasks in result order.</param>
+    /// <returns>The combined result using Combine's error policy.</returns>
+    /// <remarks>Validates tasks before cancellation. After the initial check, awaits Task.WhenAll normally;
+    /// ordinary faults retain Task.WhenAll behaviour. Cancellation after normal completion prevents result processing.
+    /// This operation cannot retrofit work cancellation or stop sibling tasks independently.</remarks>
+    public static async Task<Result<IReadOnlyList<T>>> CombineAsync<T>(
+        CancellationToken cancellationToken,
+        params Task<Result<T>>[] resultTasks)
+    {
+        ArgumentNullException.ThrowIfNull(resultTasks);
+        foreach (Task<Result<T>> task in resultTasks)
+        {
+            if (task is null)
+            {
+                throw new ArgumentException("The task collection contains a null task.", nameof(resultTasks));
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        Result<T>[] results = await Task.WhenAll(resultTasks).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Combine(results);
+    }
+
+    /// <summary>Awaits all supplied tasks, then combines their results with cancellation precedence.</summary>
+    /// <param name="cancellationToken">The required governing token, supplied when creating the underlying work.</param>
+    /// <param name="resultTasks">Already-started tasks in result order.</param>
+    /// <returns>The combined result using CombineAll's error policy.</returns>
+    /// <remarks>Validates tasks before cancellation. After the initial check, awaits Task.WhenAll normally;
+    /// ordinary faults retain Task.WhenAll behaviour. Cancellation after normal completion prevents result processing.
+    /// This operation cannot retrofit work cancellation or stop sibling tasks independently.</remarks>
+    public static async Task<Result<IReadOnlyList<T>>> CombineAllAsync<T>(
+        CancellationToken cancellationToken,
+        params Task<Result<T>>[] resultTasks)
+    {
+        ArgumentNullException.ThrowIfNull(resultTasks);
+        foreach (Task<Result<T>> task in resultTasks)
+        {
+            if (task is null)
+            {
+                throw new ArgumentException("The task collection contains a null task.", nameof(resultTasks));
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        Result<T>[] results = await Task.WhenAll(resultTasks).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return CombineAll(results);
+    }
+
+    /// <summary>Combines two supplied result tasks into a tuple with cancellation precedence.</summary>
+    /// <param name="firstTask">The first task.</param>
+    /// <param name="secondTask">The second task.</param>
+    /// <param name="cancellationToken">The governing token supplied by the caller when creating both tasks.</param>
+    /// <returns>A tuple of values or the first railway error.</returns>
+    /// <remarks>Awaits the first task normally, then checks cancellation before advancing to the second await.
+    /// Checks again after the second normal await. Unreached siblings remain the caller's responsibility;
+    /// ordinary faults propagate. No wait-only cancellation or independent sibling cancellation is performed.</remarks>
+    public static async Task<Result<(T1, T2)>> ZipAsync<T1, T2>(
+        this Task<Result<T1>> firstTask,
+        Task<Result<T2>> secondTask,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(firstTask);
+        ArgumentNullException.ThrowIfNull(secondTask);
+
+        Result<T1> first = await firstTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        Result<T2> second = await secondTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return first.Zip(second);
+    }
+
+    /// <summary>Combines two supplied result tasks using a synchronous token-aware selector.</summary>
+    /// <param name="firstTask">The first task.</param>
+    /// <param name="secondTask">The second task.</param>
+    /// <param name="selector">Called only for two successful inputs, with the unchanged governing token.</param>
+    /// <param name="cancellationToken">The governing token supplied when creating both tasks.</param>
+    /// <returns>The selected value or the first railway error.</returns>
+    /// <remarks>Awaits tasks sequentially and normally, checking cancellation after each normal await.
+    /// Checks before selector invocation and after its normal return. Selector faults propagate.
+    /// Already-started siblings not reached remain the caller's responsibility. Side effects are not rolled back.</remarks>
+    public static async Task<Result<TResult>> ZipAsync<T1, T2, TResult>(
+        this Task<Result<T1>> firstTask,
+        Task<Result<T2>> secondTask,
+        Func<T1, T2, CancellationToken, TResult> selector,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(firstTask);
+        ArgumentNullException.ThrowIfNull(secondTask);
+        ArgumentNullException.ThrowIfNull(selector);
+
+        Result<T1> first = await firstTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        Result<T2> second = await secondTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        if (first is Result<T1>.Fail firstFail)
+        {
+            Result<TResult> failure = new Result<TResult>.Fail(firstFail.Error);
+            RailwayLogging.Logger?.LogOperation("Zip", first, failure, timer.GetElapsed());
+            return failure;
+        }
+        if (second is Result<T2>.Fail secondFail)
+        {
+            Result<TResult> failure = new Result<TResult>.Fail(secondFail.Error);
+            RailwayLogging.Logger?.LogOperation("Zip", first, failure, timer.GetElapsed());
+            return failure;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        TResult value = selector(((Result<T1>.Ok)first).Value, ((Result<T2>.Ok)second).Value, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        Result<TResult> output = new Result<TResult>.Ok(value);
+        RailwayLogging.Logger?.LogOperation("Zip", first, output, timer.GetElapsed());
+        return output;
+    }
 }

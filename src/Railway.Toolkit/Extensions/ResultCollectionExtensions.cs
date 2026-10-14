@@ -381,7 +381,7 @@ public static class ResultCollectionExtensions
     /// <returns>A task containing Ok with all values if all succeed, or Fail with the first error.</returns>
     /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
     /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
-    /// <remarks>Checks cancellation before obtaining the enumerator, before each MoveNext, and before each selector invocation.
+    /// <remarks>Checks cancellation before obtaining the enumerator, before each MoveNext, before each selector invocation, after each normal selector await, and after enumeration and disposal.
     /// Every OperationCanceledException propagates; partial values and errors are discarded.
     /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
     public static async Task<Result<IReadOnlyList<TOut>>> TraverseAsync<TIn, TOut>(
@@ -412,6 +412,7 @@ public static class ResultCollectionExtensions
                 TIn item = enumerator.Current;
                 cancellationToken.ThrowIfCancellationRequested();
                 Result<TOut> result = await selector(item, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 if (result is Result<TOut>.Ok ok)
                 {
@@ -426,6 +427,7 @@ public static class ResultCollectionExtensions
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         Result<IReadOnlyList<TOut>> output = firstError is not null
             ? new Result<IReadOnlyList<TOut>>.Fail(firstError)
             : new Result<IReadOnlyList<TOut>>.Ok(results);
@@ -445,7 +447,7 @@ public static class ResultCollectionExtensions
     /// <returns>A task containing Ok with all values if all succeed, or Fail with an aggregate error.</returns>
     /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
     /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
-    /// <remarks>Checks cancellation before obtaining the enumerator, before each MoveNext, and before each selector invocation.
+    /// <remarks>Checks cancellation before obtaining the enumerator, before each MoveNext, before each selector invocation, after each normal selector await, and after enumeration and disposal.
     /// Every OperationCanceledException propagates; partial values and errors are discarded.
     /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
     public static async Task<Result<IReadOnlyList<TOut>>> TraverseAllAsync<TIn, TOut>(
@@ -476,6 +478,7 @@ public static class ResultCollectionExtensions
                 TIn item = enumerator.Current;
                 cancellationToken.ThrowIfCancellationRequested();
                 Result<TOut> result = await selector(item, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 if (result is Result<TOut>.Ok ok)
                 {
@@ -489,11 +492,109 @@ public static class ResultCollectionExtensions
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         Result<IReadOnlyList<TOut>> output = errors.Count > 0
             ? new Result<IReadOnlyList<TOut>>.Fail(Error.Aggregate(errors))
             : new Result<IReadOnlyList<TOut>>.Ok(results);
 
         RailwayLogging.Logger?.LogOperation("TraverseAllAsync", input, output, timer.GetElapsed());
         return output;
+    }
+
+    /// <summary>Sequences supplied tasks in input order with one governing cancellation token.</summary>
+    /// <param name="resultTasks">Tasks whose underlying work received the token when created by the caller.</param>
+    /// <param name="cancellationToken">The required governing token.</param>
+    /// <returns>All values, or the first error.</returns>
+    /// <remarks>Checks before obtaining the enumerator and each MoveNext. A yielded task is awaited normally,
+    /// including when enumeration requested cancellation; cancellation is checked before processing its result.
+    /// Enumeration and disposal complete before the final check. No partial result is returned on cancellation.
+    /// Already-started siblings remain the caller's responsibility. Ordinary task faults propagate.</remarks>
+    public static async Task<Result<IReadOnlyList<T>>> SequenceAsync<T>(
+        this IEnumerable<Task<Result<T>>> resultTasks,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(resultTasks);
+
+        List<T> values = new List<T>();
+        Error? firstError = null;
+        cancellationToken.ThrowIfCancellationRequested();
+        using (IEnumerator<Task<Result<T>>> enumerator = resultTasks.GetEnumerator())
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!enumerator.MoveNext())
+                {
+                    break;
+                }
+
+                // MoveNext or Current may start this task; do not abandon its normal await.
+                Result<T> result = await enumerator.Current.ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (result is Result<T>.Ok ok)
+                {
+                    values.Add(ok.Value);
+                }
+                else
+                {
+                    Result<T>.Fail fail = (Result<T>.Fail)result;
+                    firstError = fail.Error;
+                    break;
+                }
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return firstError is not null
+            ? new Result<IReadOnlyList<T>>.Fail(firstError)
+            : new Result<IReadOnlyList<T>>.Ok(values);
+    }
+
+    /// <summary>Sequences supplied tasks in input order with one governing cancellation token.</summary>
+    /// <param name="resultTasks">Tasks whose underlying work received the token when created by the caller.</param>
+    /// <param name="cancellationToken">The required governing token.</param>
+    /// <returns>All values, or an aggregate of all errors.</returns>
+    /// <remarks>Checks before obtaining the enumerator and each MoveNext. A yielded task is awaited normally,
+    /// including when enumeration requested cancellation; cancellation is checked before processing its result.
+    /// Enumeration and disposal complete before the final check. No partial result is returned on cancellation.
+    /// Already-started siblings remain the caller's responsibility. Ordinary task faults propagate.</remarks>
+    public static async Task<Result<IReadOnlyList<T>>> SequenceAllAsync<T>(
+        this IEnumerable<Task<Result<T>>> resultTasks,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(resultTasks);
+
+        List<T> values = new List<T>();
+        List<Error> errors = new List<Error>();
+        cancellationToken.ThrowIfCancellationRequested();
+        using (IEnumerator<Task<Result<T>>> enumerator = resultTasks.GetEnumerator())
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!enumerator.MoveNext())
+                {
+                    break;
+                }
+
+                // MoveNext or Current may start this task; do not abandon its normal await.
+                Result<T> result = await enumerator.Current.ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (result is Result<T>.Ok ok)
+                {
+                    values.Add(ok.Value);
+                }
+                else
+                {
+                    Result<T>.Fail fail = (Result<T>.Fail)result;
+                    errors.Add(fail.Error);
+                }
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return errors.Count > 0
+            ? new Result<IReadOnlyList<T>>.Fail(Error.Aggregate(errors))
+            : new Result<IReadOnlyList<T>>.Ok(values);
     }
 }
