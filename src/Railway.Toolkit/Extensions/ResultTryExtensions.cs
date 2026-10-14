@@ -2,7 +2,7 @@ namespace Railway.Toolkit;
 
 /// <summary>
 /// Extension methods for wrapping exception-throwing code into Results.
-/// Try operations convert non-cancellation exceptions into functional Result-based code.
+/// Try operations convert exceptions into functional Result-based code according to their cancellation policy.
 /// </summary>
 public static class ResultTryExtensions
 {
@@ -283,6 +283,186 @@ public static class ResultTryExtensions
                 output = await binder(ok.Value).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+            }
+        }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("TryBindAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>
+    /// Executes an asynchronous function and converts exceptions to a Result, except cancellation requested by the governing token.
+    /// </summary>
+    /// <typeparam name="T">The return type of the function.</typeparam>
+    /// <param name="func">The async function to execute.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <param name="errorCode">Optional error code passed to Error.FromException for converted exceptions.</param>
+    /// <returns>A task containing Ok with the function result, or Fail with a converted exception.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
+    /// <remarks>Argument validation precedes cancellation.
+    /// The token is checked immediately before delegate invocation.
+    /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<T>> TryAsync<T>(
+        Func<CancellationToken, Task<T>> func,
+        CancellationToken cancellationToken,
+        string? errorCode = null)
+    {
+        ArgumentNullException.ThrowIfNull(func);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        Result<T> output;
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            output = new Result<T>.Ok(await func(cancellationToken).ConfigureAwait(false));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            output = new Result<T>.Fail(Error.FromException(ex, errorCode));
+        }
+
+        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>
+    /// Wraps an asynchronous action in a Result, returning Unit on success.
+    /// </summary>
+    /// <param name="action">The async action to execute.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <param name="errorCode">Optional error code passed to Error.FromException for converted exceptions.</param>
+    /// <returns>A task containing Ok with Unit if successful, or Fail with a converted exception.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
+    /// <remarks>Argument validation precedes cancellation.
+    /// The token is checked immediately before delegate invocation.
+    /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<Unit>> TryAsync(
+        Func<CancellationToken, Task> action,
+        CancellationToken cancellationToken,
+        string? errorCode = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        Result<Unit> output;
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await action(cancellationToken).ConfigureAwait(false);
+            output = new Result<Unit>.Ok(Unit.Value);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            output = new Result<Unit>.Fail(Error.FromException(ex, errorCode));
+        }
+
+        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>
+    /// Applies an asynchronous function to the success value and converts exceptions to failures, except cancellation requested by the governing token.
+    /// </summary>
+    /// <typeparam name="TIn">The input value type.</typeparam>
+    /// <typeparam name="TOut">The output value type.</typeparam>
+    /// <param name="result">The result to map.</param>
+    /// <param name="mapper">The async function to apply to the success value.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <param name="errorCode">Optional error code passed to Error.FromException for converted exceptions.</param>
+    /// <returns>A task containing Ok with the mapped value, or Fail with the error or a converted exception.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
+    /// <remarks>Argument validation precedes cancellation.
+    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<TOut>> TryMapAsync<TIn, TOut>(
+        this Result<TIn> result,
+        Func<TIn, CancellationToken, Task<TOut>> mapper,
+        CancellationToken cancellationToken,
+        string? errorCode = null)
+    {
+        ArgumentNullException.ThrowIfNull(mapper);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                output = new Result<TOut>.Ok(await mapper(ok.Value, cancellationToken).ConfigureAwait(false));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+            }
+        }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("TryMapAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>
+    /// Applies an asynchronous binder function to the success value and converts exceptions to failures, except cancellation requested by the governing token.
+    /// </summary>
+    /// <typeparam name="TIn">The input value type.</typeparam>
+    /// <typeparam name="TOut">The output value type.</typeparam>
+    /// <param name="result">The result to bind.</param>
+    /// <param name="binder">The async function that returns a new Result.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <param name="errorCode">Optional error code passed to Error.FromException for converted exceptions.</param>
+    /// <returns>A task containing the result of the binder, or Fail with the error or a converted exception.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
+    /// <remarks>Argument validation precedes cancellation.
+    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<TOut>> TryBindAsync<TIn, TOut>(
+        this Result<TIn> result,
+        Func<TIn, CancellationToken, Task<Result<TOut>>> binder,
+        CancellationToken cancellationToken,
+        string? errorCode = null)
+    {
+        ArgumentNullException.ThrowIfNull(binder);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                output = await binder(ok.Value, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
             }

@@ -224,4 +224,77 @@ public static class ResultEnsureExtensions
         RailwayLogging.Logger?.LogOperation("EnsureAll", result, output, timer.GetElapsed());
         return output;
     }
+
+    /// <summary>
+    /// Validates that an asynchronous condition holds for the success value.
+    /// </summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="result">The result to validate.</param>
+    /// <param name="predicate">The async condition that must be true.</param>
+    /// <param name="error">The error to use if the predicate fails.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <returns>A task containing the validated result.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
+    /// <remarks>Argument validation precedes cancellation.
+    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Every OperationCanceledException propagates.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<T>> EnsureAsync<T>(
+        this Result<T> result,
+        Func<T, CancellationToken, Task<bool>> predicate,
+        Error error,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        ArgumentNullException.ThrowIfNull(error);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<T> output;
+
+        if (result is Result<T>.Ok ok)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            output = await predicate(ok.Value, cancellationToken).ConfigureAwait(false)
+                ? new Result<T>.Ok(ok.Value)
+                : new Result<T>.Fail(error);
+        }
+        else
+        {
+            Result<T>.Fail fail = (Result<T>.Fail)result;
+            output = new Result<T>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("EnsureAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>
+    /// Validates that an asynchronous condition holds for the success value of an async result.
+    /// </summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="resultTask">The task containing the result to validate.</param>
+    /// <param name="predicate">The async condition that must be true.</param>
+    /// <param name="error">The error to use if the predicate fails.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <returns>A task containing the validated result.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
+    /// <remarks>Argument validation precedes cancellation. Incoming result tasks are awaited normally.
+    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Every OperationCanceledException propagates.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<T>> EnsureAsync<T>(
+        this Task<Result<T>> resultTask,
+        Func<T, CancellationToken, Task<bool>> predicate,
+        Error error,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        ArgumentNullException.ThrowIfNull(error);
+
+        Result<T> result = await resultTask.ConfigureAwait(false);
+        return await result.EnsureAsync(predicate, error, cancellationToken).ConfigureAwait(false);
+    }
 }

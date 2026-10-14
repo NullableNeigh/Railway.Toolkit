@@ -368,4 +368,132 @@ public static class ResultCollectionExtensions
 
         return values;
     }
+
+    /// <summary>
+    /// Asynchronously applies a Result-returning function to each element in a collection.
+    /// Stops at the first error encountered (fail-fast).
+    /// </summary>
+    /// <typeparam name="TIn">The input element type.</typeparam>
+    /// <typeparam name="TOut">The output value type.</typeparam>
+    /// <param name="source">The source collection.</param>
+    /// <param name="selector">Async function that returns a Result for each element.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <returns>A task containing Ok with all values if all succeed, or Fail with the first error.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
+    /// <remarks>Checks cancellation before obtaining the enumerator, before each MoveNext, and before each selector invocation.
+    /// Every OperationCanceledException propagates; partial values and errors are discarded.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<IReadOnlyList<TOut>>> TraverseAsync<TIn, TOut>(
+        this IEnumerable<TIn> source,
+        Func<TIn, CancellationToken, Task<Result<TOut>>> selector,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(selector);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        List<TOut> results = new List<TOut>();
+        Error? firstError = null;
+
+        cancellationToken.ThrowIfCancellationRequested();
+        using (IEnumerator<TIn> enumerator = source.GetEnumerator())
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!enumerator.MoveNext())
+                {
+                    break;
+                }
+
+                TIn item = enumerator.Current;
+                cancellationToken.ThrowIfCancellationRequested();
+                Result<TOut> result = await selector(item, cancellationToken).ConfigureAwait(false);
+
+                if (result is Result<TOut>.Ok ok)
+                {
+                    results.Add(ok.Value);
+                }
+                else
+                {
+                    Result<TOut>.Fail fail = (Result<TOut>.Fail)result;
+                    firstError = fail.Error;
+                    break;
+                }
+            }
+        }
+
+        Result<IReadOnlyList<TOut>> output = firstError is not null
+            ? new Result<IReadOnlyList<TOut>>.Fail(firstError)
+            : new Result<IReadOnlyList<TOut>>.Ok(results);
+        RailwayLogging.Logger?.LogOperation("TraverseAsync", input, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>
+    /// Asynchronously applies a Result-returning function to each element in a collection.
+    /// Processes all elements and collects all errors before failing (validate-all).
+    /// </summary>
+    /// <typeparam name="TIn">The input element type.</typeparam>
+    /// <typeparam name="TOut">The output value type.</typeparam>
+    /// <param name="source">The source collection.</param>
+    /// <param name="selector">Async function that returns a Result for each element.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <returns>A task containing Ok with all values if all succeed, or Fail with an aggregate error.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
+    /// <remarks>Checks cancellation before obtaining the enumerator, before each MoveNext, and before each selector invocation.
+    /// Every OperationCanceledException propagates; partial values and errors are discarded.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<IReadOnlyList<TOut>>> TraverseAllAsync<TIn, TOut>(
+        this IEnumerable<TIn> source,
+        Func<TIn, CancellationToken, Task<Result<TOut>>> selector,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(selector);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        List<TOut> results = new List<TOut>();
+        List<Error> errors = new List<Error>();
+
+        cancellationToken.ThrowIfCancellationRequested();
+        using (IEnumerator<TIn> enumerator = source.GetEnumerator())
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!enumerator.MoveNext())
+                {
+                    break;
+                }
+
+                TIn item = enumerator.Current;
+                cancellationToken.ThrowIfCancellationRequested();
+                Result<TOut> result = await selector(item, cancellationToken).ConfigureAwait(false);
+
+                if (result is Result<TOut>.Ok ok)
+                {
+                    results.Add(ok.Value);
+                }
+                else
+                {
+                    Result<TOut>.Fail fail = (Result<TOut>.Fail)result;
+                    errors.Add(fail.Error);
+                }
+            }
+        }
+
+        Result<IReadOnlyList<TOut>> output = errors.Count > 0
+            ? new Result<IReadOnlyList<TOut>>.Fail(Error.Aggregate(errors))
+            : new Result<IReadOnlyList<TOut>>.Ok(results);
+
+        RailwayLogging.Logger?.LogOperation("TraverseAllAsync", input, output, timer.GetElapsed());
+        return output;
+    }
 }

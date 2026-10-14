@@ -110,4 +110,74 @@ public static class ResultMapExtensions
         Result<TIn> result = await resultTask.ConfigureAwait(false);
         return await result.MapAsync(mapper).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Transforms the success value using an asynchronous function.
+    /// If the result is Fail, the error passes through unchanged.
+    /// </summary>
+    /// <typeparam name="TIn">The input value type.</typeparam>
+    /// <typeparam name="TOut">The output value type.</typeparam>
+    /// <param name="result">The result to transform.</param>
+    /// <param name="mapper">The async function to apply to the success value.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <returns>A task containing the transformed result.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
+    /// <remarks>Argument validation precedes cancellation.
+    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Every OperationCanceledException propagates.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<TOut>> MapAsync<TIn, TOut>(
+        this Result<TIn> result,
+        Func<TIn, CancellationToken, Task<TOut>> mapper,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(mapper);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TOut mapped = await mapper(ok.Value, cancellationToken).ConfigureAwait(false);
+            output = new Result<TOut>.Ok(mapped);
+        }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("MapAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>
+    /// Transforms the success value using an asynchronous function on an async result.
+    /// If the result is Fail, the error passes through unchanged.
+    /// </summary>
+    /// <typeparam name="TIn">The input value type.</typeparam>
+    /// <typeparam name="TOut">The output value type.</typeparam>
+    /// <param name="resultTask">The task containing the result to transform.</param>
+    /// <param name="mapper">The async function to apply to the success value.</param>
+    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
+    /// <returns>A task containing the transformed result.</returns>
+    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
+    /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
+    /// <remarks>Argument validation precedes cancellation. Incoming result tasks are awaited normally.
+    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Every OperationCanceledException propagates.
+    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    public static async Task<Result<TOut>> MapAsync<TIn, TOut>(
+        this Task<Result<TIn>> resultTask,
+        Func<TIn, CancellationToken, Task<TOut>> mapper,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(mapper);
+
+        Result<TIn> result = await resultTask.ConfigureAwait(false);
+        return await result.MapAsync(mapper, cancellationToken).ConfigureAwait(false);
+    }
 }
