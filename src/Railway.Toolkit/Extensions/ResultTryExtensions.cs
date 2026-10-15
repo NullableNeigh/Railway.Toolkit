@@ -308,7 +308,7 @@ public static class ResultTryExtensions
     /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
     /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
     /// <remarks>Argument validation precedes cancellation.
-    /// The token is checked immediately before delegate invocation.
+    /// The token is checked before delegate invocation and after normal completion; ordinary faults retain Try conversion.
     /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
     /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
     public static async Task<Result<T>> TryAsync<T>(
@@ -326,7 +326,9 @@ public static class ResultTryExtensions
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            output = new Result<T>.Ok(await func(cancellationToken).ConfigureAwait(false));
+            T value = await func(cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            output = new Result<T>.Ok(value);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
@@ -347,7 +349,7 @@ public static class ResultTryExtensions
     /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
     /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
     /// <remarks>Argument validation precedes cancellation.
-    /// The token is checked immediately before delegate invocation.
+    /// The token is checked before delegate invocation and after normal completion; ordinary faults retain Try conversion.
     /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
     /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
     public static async Task<Result<Unit>> TryAsync(
@@ -366,6 +368,7 @@ public static class ResultTryExtensions
         {
             cancellationToken.ThrowIfCancellationRequested();
             await action(cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             output = new Result<Unit>.Ok(Unit.Value);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -390,7 +393,7 @@ public static class ResultTryExtensions
     /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
     /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
     /// <remarks>Argument validation precedes cancellation.
-    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Direct Result failures skip the delegate without observing cancellation. The token is checked before delegate invocation and after normal awaits.
     /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
     /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
     public static async Task<Result<TOut>> TryMapAsync<TIn, TOut>(
@@ -410,7 +413,9 @@ public static class ResultTryExtensions
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                output = new Result<TOut>.Ok(await mapper(ok.Value, cancellationToken).ConfigureAwait(false));
+                TOut mapped = await mapper(ok.Value, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                output = new Result<TOut>.Ok(mapped);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
@@ -440,7 +445,7 @@ public static class ResultTryExtensions
     /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
     /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
     /// <remarks>Argument validation precedes cancellation.
-    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Direct Result failures skip the delegate without observing cancellation. The token is checked before delegate invocation and after normal awaits.
     /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
     /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
     public static async Task<Result<TOut>> TryBindAsync<TIn, TOut>(
@@ -461,6 +466,7 @@ public static class ResultTryExtensions
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 output = await binder(ok.Value, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {

@@ -120,7 +120,7 @@ public static class ResultBindExtensions
     /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
     /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
     /// <remarks>Argument validation precedes cancellation.
-    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Direct Result failures skip the delegate without observing cancellation. The token is checked before delegate invocation and after normal awaits.
     /// Every OperationCanceledException propagates.
     /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
     public static async Task<Result<TOut>> BindAsync<TIn, TOut>(
@@ -138,6 +138,7 @@ public static class ResultBindExtensions
         {
             cancellationToken.ThrowIfCancellationRequested();
             output = await binder(ok.Value, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
         }
         else
         {
@@ -160,8 +161,8 @@ public static class ResultBindExtensions
     /// <returns>A task containing the bound result.</returns>
     /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
     /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
-    /// <remarks>Argument validation precedes cancellation. Incoming result tasks are awaited normally.
-    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// <remarks>Argument validation precedes cancellation. Incoming result tasks are awaited normally, then cancellation is checked before either track is processed.
+    /// Direct Result failures skip the delegate without observing cancellation. The token is checked before delegate invocation and after normal awaits.
     /// Every OperationCanceledException propagates.
     /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
     public static async Task<Result<TOut>> BindAsync<TIn, TOut>(
@@ -172,6 +173,7 @@ public static class ResultBindExtensions
         ArgumentNullException.ThrowIfNull(binder);
 
         Result<TIn> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         return await result.BindAsync(binder, cancellationToken).ConfigureAwait(false);
     }
 }

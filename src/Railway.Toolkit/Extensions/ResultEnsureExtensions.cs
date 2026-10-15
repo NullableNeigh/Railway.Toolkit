@@ -237,7 +237,7 @@ public static class ResultEnsureExtensions
     /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
     /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
     /// <remarks>Argument validation precedes cancellation.
-    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// Direct Result failures skip the delegate without observing cancellation. The token is checked before delegate invocation and after normal awaits.
     /// Every OperationCanceledException propagates.
     /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
     public static async Task<Result<T>> EnsureAsync<T>(
@@ -256,7 +256,9 @@ public static class ResultEnsureExtensions
         if (result is Result<T>.Ok ok)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            output = await predicate(ok.Value, cancellationToken).ConfigureAwait(false)
+            bool valid = await predicate(ok.Value, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            output = valid
                 ? new Result<T>.Ok(ok.Value)
                 : new Result<T>.Fail(error);
         }
@@ -281,8 +283,8 @@ public static class ResultEnsureExtensions
     /// <returns>A task containing the validated result.</returns>
     /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
     /// <exception cref="OperationCanceledException">The governing token is requested at an observation point, or consumer work raises cancellation.</exception>
-    /// <remarks>Argument validation precedes cancellation. Incoming result tasks are awaited normally.
-    /// Existing failures skip the delegate without observing cancellation. The token is checked before delegate invocation.
+    /// <remarks>Argument validation precedes cancellation. Incoming result tasks are awaited normally, then cancellation is checked before either track is processed.
+    /// Direct Result failures skip the delegate without observing cancellation. The token is checked before delegate invocation and after normal awaits.
     /// Every OperationCanceledException propagates.
     /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
     public static async Task<Result<T>> EnsureAsync<T>(
@@ -295,6 +297,7 @@ public static class ResultEnsureExtensions
         ArgumentNullException.ThrowIfNull(error);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         return await result.EnsureAsync(predicate, error, cancellationToken).ConfigureAwait(false);
     }
 }
