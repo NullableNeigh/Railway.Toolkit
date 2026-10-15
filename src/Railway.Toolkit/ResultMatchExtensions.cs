@@ -18,6 +18,103 @@ public static class ResultMatchExtensions
         global::System.Func<Result<T>.Ok, TMatchOutput> @ok,
         global::System.Func<Result<T>.Fail, TMatchOutput> @fail
     ) => (await unionTask.ConfigureAwait(false)).Match(@ok, @fail);
+
+    /// <summary>Matches the selected track with a token-aware handler.</summary>
+    /// <typeparam name="TMatchOutput">The TMatchOutput type.</typeparam>
+    /// <typeparam name="T">The T type.</typeparam>
+    /// <param name="result">The result to match.</param>
+    /// <param name="ok">The success handler.</param>
+    /// <param name="fail">The failure handler.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log.</remarks>
+    public static async Task<TMatchOutput> MatchAsync<TMatchOutput, T>(
+        this Result<T> result,
+        Func<Result<T>.Ok, CancellationToken, Task<TMatchOutput>> ok,
+        Func<Result<T>.Fail, CancellationToken, Task<TMatchOutput>> fail,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(ok);
+        ArgumentNullException.ThrowIfNull(fail);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        TMatchOutput output;
+        if (result is Result<T>.Ok success)
+        {
+            output = await ok(success, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            output = await fail((Result<T>.Fail)result, cancellationToken).ConfigureAwait(false);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return output;
+    }
+
+    /// <summary>Matches the selected track with a token-aware handler.</summary>
+    /// <typeparam name="TMatchOutput">The TMatchOutput type.</typeparam>
+    /// <typeparam name="T">The T type.</typeparam>
+    /// <param name="unionTask">The incoming result task.</param>
+    /// <param name="ok">The success handler.</param>
+    /// <param name="fail">The failure handler.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log.</remarks>
+    public static async Task<TMatchOutput> MatchAsync<TMatchOutput, T>(
+        this Task<Result<T>> unionTask,
+        Func<Result<T>.Ok, CancellationToken, Task<TMatchOutput>> ok,
+        Func<Result<T>.Fail, CancellationToken, Task<TMatchOutput>> fail,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(ok);
+        ArgumentNullException.ThrowIfNull(fail);
+
+        Result<T> result = await unionTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return await result.MatchAsync(ok, fail, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Matches the selected track with a token-aware handler.</summary>
+    /// <typeparam name="TMatchOutput">The TMatchOutput type.</typeparam>
+    /// <typeparam name="T">The T type.</typeparam>
+    /// <param name="unionTask">The incoming result task.</param>
+    /// <param name="ok">The success handler.</param>
+    /// <param name="fail">The failure handler.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log.</remarks>
+    public static async Task<TMatchOutput> MatchAsync<TMatchOutput, T>(
+        this Task<Result<T>> unionTask,
+        Func<Result<T>.Ok, CancellationToken, TMatchOutput> ok,
+        Func<Result<T>.Fail, CancellationToken, TMatchOutput> fail,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(ok);
+        ArgumentNullException.ThrowIfNull(fail);
+
+        Result<T> result = await unionTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        TMatchOutput output;
+        if (result is Result<T>.Ok success)
+        {
+            output = ok(success, cancellationToken);
+        }
+        else
+        {
+            output = fail((Result<T>.Fail)result, cancellationToken);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return output;
+    }
 }
 
 #pragma warning restore 1591

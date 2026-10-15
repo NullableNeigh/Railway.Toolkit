@@ -321,9 +321,54 @@ continue to propagate every `OperationCanceledException`, including in Try metho
 Choosing a token-aware Try overload therefore intentionally changes unrequested
 cancellation into a failure.
 
-Token overloads are limited to the operations above. They are not provided for
-failure-track operations, `FinallyAsync`, `MatchAsync`, or other synchronous
-delegates beyond the Zip selector above.
+### Error handling, matching, and synchronous callbacks
+
+`MapErrorAsync` and `TapErrorAsync` accept token-aware async callbacks on both
+`Result<T>` and `Task<Result<T>>`. Cancellation may skip error transformation or
+diagnostic callbacks. A direct Ok bypasses these callbacks and cancellation checks.
+An incoming task is awaited normally, then cancellation wins over either track.
+
+Task receivers also accept token-aware synchronous callbacks for `BindAsync`,
+`MapAsync`, `EnsureAsync`, `TapAsync`, `MapErrorAsync`, and `TapErrorAsync`.
+The token is checked before invocation and after a normal return; synchronous
+work cannot be interrupted. `EnsureAsync` places its Error argument before the token.
+
+`MatchAsync` supports two async token-aware handlers on direct Results and Task
+receivers, and two synchronous token-aware handlers on Task receivers. Handlers
+receive the `Result<T>.Ok` or `Result<T>.Fail` case and the governing token. Only
+the selected handler runs, and cancellation may skip either handler. Both handlers
+are required. No new ValueTask or mixed handler forms are provided.
+
+```csharp
+Result<int> handled = await incoming
+    .MapErrorAsync((error, token) => Task.FromResult(error), cancellationToken)
+    .TapErrorAsync((error, token) => WriteDiagnosticAsync(error, token), cancellationToken);
+
+string message = await handled.MatchAsync(
+    (ok, token) => FormatSuccessAsync(ok.Value, token),
+    (fail, token) => FormatFailureAsync(fail.Error, token), cancellationToken);
+```
+
+These overloads require a final governing token and forward it unchanged. They
+check cancellation after normal awaits and callback returns before producing output.
+Ordinary faults propagate, even if cancellation was also requested. Existing
+tokenless overloads preserve their behaviour.
+
+### Finally always runs
+
+**Behaviour change:** both Task-receiver `FinallyAsync` overloads now run cleanup
+after Ok, Fail, an incoming exception, or incoming cancellation, just like C#
+`finally`. Cleanup runs once after the incoming task completes and is awaited
+normally. Request cancellation cannot skip it.
+
+After successful cleanup, the original result, exception, or cancellation continues.
+If cleanup itself throws or cancels, its exception takes precedence, just as in
+C# `finally`. Review existing cleanup callbacks because they now execute after
+incoming exceptions and cancellation too.
+
+Cleanup remains tokenless; no pipeline token is forwarded to it. Applications that
+need a cleanup timeout control it explicitly inside their callback. Required resource
+disposal still runs, and no output-result log is emitted for exceptions or cancellation.
 
 ### Recover - Error Recovery
 

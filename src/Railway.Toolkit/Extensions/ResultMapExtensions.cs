@@ -182,4 +182,42 @@ public static class ResultMapExtensions
         cancellationToken.ThrowIfCancellationRequested();
         return await result.MapAsync(mapper, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>Runs a synchronous callback after awaiting a result.</summary>
+    /// <typeparam name="TIn">The TIn type.</typeparam>
+    /// <typeparam name="TOut">The TOut type.</typeparam>
+    /// <param name="resultTask">The incoming result task.</param>
+    /// <param name="mapper">The token-aware synchronous callback.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log. Synchronous work is not interrupted.</remarks>
+    public static async Task<Result<TOut>> MapAsync<TIn, TOut>(
+        this Task<Result<TIn>> resultTask,
+        Func<TIn, CancellationToken, TOut> mapper,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(mapper);
+
+        Result<TIn> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TOut value = mapper(ok.Value, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            output = new Result<TOut>.Ok(value);
+        }
+        else
+        {
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("Map", result, output, timer.GetElapsed());
+        return output;
+    }
 }

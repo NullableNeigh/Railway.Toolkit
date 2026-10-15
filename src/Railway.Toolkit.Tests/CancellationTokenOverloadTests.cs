@@ -541,11 +541,12 @@ public class CancellationTokenOverloadTests
     {
         Dictionary<string, int> expected = new Dictionary<string, int>
         {
-            ["BindAsync"] = 2, ["MapAsync"] = 2, ["EnsureAsync"] = 2, ["TapAsync"] = 2,
+            ["BindAsync"] = 3, ["MapAsync"] = 3, ["EnsureAsync"] = 3, ["TapAsync"] = 3,
             ["TryAsync"] = 2, ["TryMapAsync"] = 1, ["TryBindAsync"] = 1,
             ["TraverseAsync"] = 1, ["TraverseAllAsync"] = 1,
             ["SequenceAsync"] = 1, ["SequenceAllAsync"] = 1,
-            ["CombineAsync"] = 1, ["CombineAllAsync"] = 1, ["ZipAsync"] = 2
+            ["CombineAsync"] = 1, ["CombineAllAsync"] = 1, ["ZipAsync"] = 2,
+            ["MapErrorAsync"] = 3, ["TapErrorAsync"] = 3, ["MatchAsync"] = 3
         };
         Dictionary<string, int> actual = new Dictionary<string, int>();
         foreach (Type type in typeof(Result<>).Assembly.GetExportedTypes())

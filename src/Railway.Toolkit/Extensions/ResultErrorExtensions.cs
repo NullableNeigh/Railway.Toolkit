@@ -269,4 +269,92 @@ public static class ResultErrorExtensions
     {
         return result.OrElseWith(alternativeFactory);
     }
+
+    /// <summary>Runs cancellable asynchronous failure-track work.</summary>
+    /// <typeparam name="T">The T type.</typeparam>
+    /// <param name="result">The incoming result.</param>
+    /// <param name="mapper">The error callback.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log. Direct Ok inputs bypass cancellation and the
+    /// callback.</remarks>
+    public static async Task<Result<T>> MapErrorAsync<T>(
+        this Result<T> result,
+        Func<Error, CancellationToken, Task<Error>> mapper,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(mapper);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<T> output = result;
+        if (result is Result<T>.Fail fail)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Error error = await mapper(fail.Error, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            output = new Result<T>.Fail(error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("MapErrorAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs cancellable asynchronous failure-track work.</summary>
+    /// <typeparam name="T">The T type.</typeparam>
+    /// <param name="resultTask">The incoming result task.</param>
+    /// <param name="mapper">The error callback.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log. Direct Ok inputs bypass cancellation and the
+    /// callback.</remarks>
+    public static async Task<Result<T>> MapErrorAsync<T>(
+        this Task<Result<T>> resultTask,
+        Func<Error, CancellationToken, Task<Error>> mapper,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(mapper);
+
+        Result<T> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return await result.MapErrorAsync(mapper, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Runs a synchronous callback after awaiting a result.</summary>
+    /// <typeparam name="T">The T type.</typeparam>
+    /// <param name="resultTask">The incoming result task.</param>
+    /// <param name="mapper">The token-aware synchronous callback.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log. Synchronous work is not interrupted.</remarks>
+    public static async Task<Result<T>> MapErrorAsync<T>(
+        this Task<Result<T>> resultTask,
+        Func<Error, CancellationToken, Error> mapper,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(mapper);
+
+        Result<T> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<T> output = result;
+        if (result is Result<T>.Fail fail)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Error error = mapper(fail.Error, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            output = new Result<T>.Fail(error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("MapError", result, output, timer.GetElapsed());
+        return output;
+    }
 }
