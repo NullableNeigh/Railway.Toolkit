@@ -300,4 +300,40 @@ public static class ResultEnsureExtensions
         cancellationToken.ThrowIfCancellationRequested();
         return await result.EnsureAsync(predicate, error, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>Runs a synchronous callback after awaiting a result.</summary>
+    /// <typeparam name="T">The T type.</typeparam>
+    /// <param name="resultTask">The incoming result task.</param>
+    /// <param name="predicate">The token-aware synchronous callback.</param>
+    /// <param name="error">The error when validation fails.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log. Synchronous work is not interrupted.</remarks>
+    public static async Task<Result<T>> EnsureAsync<T>(
+        this Task<Result<T>> resultTask,
+        Func<T, CancellationToken, bool> predicate,
+        Error error,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        ArgumentNullException.ThrowIfNull(error);
+
+        Result<T> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<T> output = result;
+        if (result is Result<T>.Ok ok)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            bool valid = predicate(ok.Value, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            output = valid ? result : new Result<T>.Fail(error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("Ensure", result, output, timer.GetElapsed());
+        return output;
+    }
 }

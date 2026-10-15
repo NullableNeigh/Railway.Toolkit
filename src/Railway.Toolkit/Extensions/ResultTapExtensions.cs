@@ -294,37 +294,69 @@ public static class ResultTapExtensions
     }
 
     /// <summary>
-    /// Executes a sync action regardless of track on an async result.
+    /// Always executes a sync action after an incoming task, including faults and cancellation.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="resultTask">The task containing the result to tap into.</param>
     /// <param name="action">The action to execute.</param>
     /// <returns>A task containing the original result unchanged.</returns>
+    /// <remarks>Cleanup runs once even when the incoming task throws or cancels. Request cancellation cannot skip cleanup.
+    /// Cleanup is tokenless and awaited normally. Its exception takes precedence over an incoming exception or cancellation, as in C# finally.
+    /// Otherwise the original result, exception, or cancellation is preserved. No output-result log is emitted for faults or cancellation.</remarks>
     public static async Task<Result<T>> FinallyAsync<T>(
         this Task<Result<T>> resultTask,
         Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        Result<T> result = await resultTask.ConfigureAwait(false);
-        return result.Finally(action);
+        Result<T>? result = null;
+        bool completed = false;
+        try
+        {
+            result = await resultTask.ConfigureAwait(false);
+            completed = true;
+        }
+        finally
+        {
+            using IRailwayTimer timer = RailwayLogging.StartOperation();
+            action();
+            if (completed)
+                RailwayLogging.Logger?.LogOperation("Finally", result!, result!, timer.GetElapsed());
+        }
+        return result!;
     }
 
     /// <summary>
-    /// Executes an async action regardless of track on an async result.
+    /// Always executes and awaits cleanup after an incoming task, including faults and cancellation.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="resultTask">The task containing the result to tap into.</param>
     /// <param name="action">The async action to execute.</param>
     /// <returns>A task containing the original result unchanged.</returns>
+    /// <remarks>Cleanup runs once even when the incoming task throws or cancels. Request cancellation cannot skip cleanup.
+    /// Cleanup is tokenless and awaited normally. Its exception takes precedence over an incoming exception or cancellation, as in C# finally.
+    /// Otherwise the original result, exception, or cancellation is preserved. No output-result log is emitted for faults or cancellation.</remarks>
     public static async Task<Result<T>> FinallyAsync<T>(
         this Task<Result<T>> resultTask,
         Func<Task> action)
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        Result<T> result = await resultTask.ConfigureAwait(false);
-        return await result.FinallyAsync(action).ConfigureAwait(false);
+        Result<T>? result = null;
+        bool completed = false;
+        try
+        {
+            result = await resultTask.ConfigureAwait(false);
+            completed = true;
+        }
+        finally
+        {
+            using IRailwayTimer timer = RailwayLogging.StartOperation();
+            await action().ConfigureAwait(false);
+            if (completed)
+                RailwayLogging.Logger?.LogOperation("FinallyAsync", result!, result!, timer.GetElapsed());
+        }
+        return result!;
     }
 
     /// <summary>
@@ -385,5 +417,123 @@ public static class ResultTapExtensions
         Result<T> result = await resultTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return await result.TapAsync(action, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Runs cancellable asynchronous failure-track work.</summary>
+    /// <typeparam name="T">The T type.</typeparam>
+    /// <param name="result">The incoming result.</param>
+    /// <param name="action">The error callback.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log. Direct Ok inputs bypass cancellation and the
+    /// callback.</remarks>
+    public static async Task<Result<T>> TapErrorAsync<T>(
+        this Result<T> result,
+        Func<Error, CancellationToken, Task> action,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<T> output = result;
+        if (result is Result<T>.Fail fail)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await action(fail.Error, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs cancellable asynchronous failure-track work.</summary>
+    /// <typeparam name="T">The T type.</typeparam>
+    /// <param name="resultTask">The incoming result task.</param>
+    /// <param name="action">The error callback.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log. Direct Ok inputs bypass cancellation and the
+    /// callback.</remarks>
+    public static async Task<Result<T>> TapErrorAsync<T>(
+        this Task<Result<T>> resultTask,
+        Func<Error, CancellationToken, Task> action,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        Result<T> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return await result.TapErrorAsync(action, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Runs a synchronous callback after awaiting a result.</summary>
+    /// <typeparam name="T">The T type.</typeparam>
+    /// <param name="resultTask">The incoming result task.</param>
+    /// <param name="action">The token-aware synchronous callback.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log. Synchronous work is not interrupted.</remarks>
+    public static async Task<Result<T>> TapAsync<T>(
+        this Task<Result<T>> resultTask,
+        Action<T, CancellationToken> action,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        Result<T> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<T> output = result;
+        if (result is Result<T>.Ok ok)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            action(ok.Value, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        RailwayLogging.Logger?.LogOperation("Tap", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs a synchronous callback after awaiting a result.</summary>
+    /// <typeparam name="T">The T type.</typeparam>
+    /// <param name="resultTask">The incoming result task.</param>
+    /// <param name="action">The token-aware synchronous callback.</param>
+    /// <param name="cancellationToken">The required governing token forwarded unchanged.</param>
+    /// <returns>The operation completion and output.</returns>
+    /// <remarks>Arguments are validated first. Incoming tasks are awaited normally, then cancellation is checked before
+    /// either track. The same token is forwarded to the selected callback. Cancellation is checked before invocation
+    /// and after normal completion, before output processing or logging. Exceptions propagate; completed effects are
+    /// not rolled back. Cancellation emits no operation log. Synchronous work is not interrupted.</remarks>
+    public static async Task<Result<T>> TapErrorAsync<T>(
+        this Task<Result<T>> resultTask,
+        Action<Error, CancellationToken> action,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        Result<T> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<T> output = result;
+        if (result is Result<T>.Fail fail)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            action(fail.Error, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        RailwayLogging.Logger?.LogOperation("TapError", result, output, timer.GetElapsed());
+        return output;
     }
 }
