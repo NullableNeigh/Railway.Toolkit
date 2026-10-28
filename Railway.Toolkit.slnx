@@ -5,4 +5,5 @@
   </Folder>
   <Project Path="src/Railway.Toolkit/Railway.Toolkit.csproj" />
   <Project Path="src/Railway.Toolkit.Tests/Railway.Toolkit.Tests.csproj" />
+  <Project Path="src/Railway.Toolkit.Benchmarks/Railway.Toolkit.Benchmarks.csproj" />
 </Solution>
