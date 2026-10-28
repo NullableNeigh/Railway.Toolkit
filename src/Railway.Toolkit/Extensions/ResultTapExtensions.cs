@@ -19,6 +19,7 @@ public static class ResultTapExtensions
         this Result<T> result,
         Action<T> action)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(action);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -45,6 +46,7 @@ public static class ResultTapExtensions
         this Result<T> result,
         Action action)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(action);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -71,6 +73,7 @@ public static class ResultTapExtensions
         this Result<T> result,
         Action<Error> action)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(action);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -97,6 +100,7 @@ public static class ResultTapExtensions
         this Result<T> result,
         Action action)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(action);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -121,10 +125,20 @@ public static class ResultTapExtensions
         this Task<Result<T>> resultTask,
         Action<T> action)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(action);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
-        return result.Tap(action);
+        result = RailwayContracts.Output(result);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        if (result is Result<T>.Ok ok)
+        {
+            action(ok.Value);
+        }
+
+        RailwayLogging.Logger?.LogOperation("TapAsync", result, result, timer.GetElapsed());
+        return result;
     }
 
     /// <summary>
@@ -138,13 +152,14 @@ public static class ResultTapExtensions
         this Result<T> result,
         Func<T, Task> action)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(action);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
 
         if (result is Result<T>.Ok ok)
         {
-            await action(ok.Value).ConfigureAwait(false);
+            await RailwayContracts.Output(action(ok.Value)).ConfigureAwait(false);
         }
 
         RailwayLogging.Logger?.LogOperation("TapAsync", result, result, timer.GetElapsed());
@@ -162,9 +177,11 @@ public static class ResultTapExtensions
         this Task<Result<T>> resultTask,
         Func<T, Task> action)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(action);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
+        result = RailwayContracts.Output(result);
         return await result.TapAsync(action).ConfigureAwait(false);
     }
 
@@ -179,10 +196,20 @@ public static class ResultTapExtensions
         this Task<Result<T>> resultTask,
         Action<Error> action)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(action);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
-        return result.TapError(action);
+        result = RailwayContracts.Output(result);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        if (result is Result<T>.Fail fail)
+        {
+            action(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, result, timer.GetElapsed());
+        return result;
     }
 
     /// <summary>
@@ -196,13 +223,14 @@ public static class ResultTapExtensions
         this Result<T> result,
         Func<Error, Task> action)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(action);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
 
         if (result is Result<T>.Fail fail)
         {
-            await action(fail.Error).ConfigureAwait(false);
+            await RailwayContracts.Output(action(fail.Error)).ConfigureAwait(false);
         }
 
         RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, result, timer.GetElapsed());
@@ -220,9 +248,11 @@ public static class ResultTapExtensions
         this Task<Result<T>> resultTask,
         Func<Error, Task> action)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(action);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
+        result = RailwayContracts.Output(result);
         return await result.TapErrorAsync(action).ConfigureAwait(false);
     }
 
@@ -239,6 +269,7 @@ public static class ResultTapExtensions
         this Result<T> result,
         Action action)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(action);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -262,6 +293,7 @@ public static class ResultTapExtensions
         this Result<T> result,
         Action<Result<T>> action)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(action);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -283,11 +315,12 @@ public static class ResultTapExtensions
         this Result<T> result,
         Func<Task> action)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(action);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-        await action().ConfigureAwait(false);
+        await RailwayContracts.Output(action()).ConfigureAwait(false);
 
         RailwayLogging.Logger?.LogOperation("FinallyAsync", result, result, timer.GetElapsed());
         return result;
@@ -307,13 +340,14 @@ public static class ResultTapExtensions
         this Task<Result<T>> resultTask,
         Action action)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(action);
 
         Result<T>? result = null;
         bool completed = false;
         try
         {
-            result = await resultTask.ConfigureAwait(false);
+            result = RailwayContracts.Output(await resultTask.ConfigureAwait(false));
             completed = true;
         }
         finally
@@ -321,7 +355,7 @@ public static class ResultTapExtensions
             using IRailwayTimer timer = RailwayLogging.StartOperation();
             action();
             if (completed)
-                RailwayLogging.Logger?.LogOperation("Finally", result!, result!, timer.GetElapsed());
+                RailwayLogging.Logger?.LogOperation("FinallyAsync", result!, result!, timer.GetElapsed());
         }
         return result!;
     }
@@ -340,19 +374,20 @@ public static class ResultTapExtensions
         this Task<Result<T>> resultTask,
         Func<Task> action)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(action);
 
         Result<T>? result = null;
         bool completed = false;
         try
         {
-            result = await resultTask.ConfigureAwait(false);
+            result = RailwayContracts.Output(await resultTask.ConfigureAwait(false));
             completed = true;
         }
         finally
         {
             using IRailwayTimer timer = RailwayLogging.StartOperation();
-            await action().ConfigureAwait(false);
+            await RailwayContracts.Output(action()).ConfigureAwait(false);
             if (completed)
                 RailwayLogging.Logger?.LogOperation("FinallyAsync", result!, result!, timer.GetElapsed());
         }
@@ -378,6 +413,7 @@ public static class ResultTapExtensions
         Func<T, CancellationToken, Task> action,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(action);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -385,7 +421,7 @@ public static class ResultTapExtensions
         if (result is Result<T>.Ok ok)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await action(ok.Value, cancellationToken).ConfigureAwait(false);
+            await RailwayContracts.Output(action(ok.Value, cancellationToken)).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
         }
 
@@ -412,10 +448,12 @@ public static class ResultTapExtensions
         Func<T, CancellationToken, Task> action,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(action);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         return await result.TapAsync(action, cancellationToken).ConfigureAwait(false);
     }
 
@@ -435,6 +473,7 @@ public static class ResultTapExtensions
         Func<Error, CancellationToken, Task> action,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(action);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -442,7 +481,7 @@ public static class ResultTapExtensions
         if (result is Result<T>.Fail fail)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await action(fail.Error, cancellationToken).ConfigureAwait(false);
+            await RailwayContracts.Output(action(fail.Error, cancellationToken)).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
         }
 
@@ -466,10 +505,12 @@ public static class ResultTapExtensions
         Func<Error, CancellationToken, Task> action,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(action);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         return await result.TapErrorAsync(action, cancellationToken).ConfigureAwait(false);
     }
 
@@ -488,10 +529,12 @@ public static class ResultTapExtensions
         Action<T, CancellationToken> action,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(action);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<T> output = result;
         if (result is Result<T>.Ok ok)
@@ -501,7 +544,7 @@ public static class ResultTapExtensions
             cancellationToken.ThrowIfCancellationRequested();
         }
 
-        RailwayLogging.Logger?.LogOperation("Tap", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("TapAsync", result, output, timer.GetElapsed());
         return output;
     }
 
@@ -520,10 +563,12 @@ public static class ResultTapExtensions
         Action<Error, CancellationToken> action,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(action);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<T> output = result;
         if (result is Result<T>.Fail fail)
@@ -533,7 +578,7 @@ public static class ResultTapExtensions
             cancellationToken.ThrowIfCancellationRequested();
         }
 
-        RailwayLogging.Logger?.LogOperation("TapError", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, output, timer.GetElapsed());
         return output;
     }
 }

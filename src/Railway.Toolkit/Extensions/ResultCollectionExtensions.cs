@@ -30,6 +30,7 @@ public static class ResultCollectionExtensions
         foreach (TIn? item in source)
         {
             Result<TOut> result = selector(item);
+            result = RailwayContracts.Output(result);
 
             if (result is Result<TOut>.Ok ok)
             {
@@ -74,6 +75,7 @@ public static class ResultCollectionExtensions
         foreach (TIn? item in source)
         {
             Result<TOut> result = selector(item);
+            result = RailwayContracts.Output(result);
 
             if (result is Result<TOut>.Ok ok)
             {
@@ -117,7 +119,8 @@ public static class ResultCollectionExtensions
 
         foreach (TIn? item in source)
         {
-            Result<TOut> result = await selector(item).ConfigureAwait(false);
+            Result<TOut> result = await RailwayContracts.Output(selector(item)).ConfigureAwait(false);
+            result = RailwayContracts.Output(result);
 
             if (result is Result<TOut>.Ok ok)
             {
@@ -161,7 +164,8 @@ public static class ResultCollectionExtensions
 
         foreach (TIn? item in source)
         {
-            Result<TOut> result = await selector(item).ConfigureAwait(false);
+            Result<TOut> result = await RailwayContracts.Output(selector(item)).ConfigureAwait(false);
+            result = RailwayContracts.Output(result);
 
             if (result is Result<TOut>.Ok ok)
             {
@@ -193,10 +197,13 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<T> values = new List<T>();
 
         foreach (Result<T> result in results)
         {
+            ArgumentNullException.ThrowIfNull(result);
             if (result is Result<T>.Ok ok)
             {
                 values.Add(ok.Value);
@@ -204,11 +211,17 @@ public static class ResultCollectionExtensions
             else
             {
                 Result<T>.Fail fail = (Result<T>.Fail)result;
-                return fail.Error;
+                Result<IReadOnlyList<T>> failureOutput = new Result<IReadOnlyList<T>>.Fail(fail.Error);
+                RailwayLogging.Logger?.LogOperation("Sequence", input, failureOutput, timer.GetElapsed());
+                return failureOutput;
             }
         }
 
-        return values;
+        Result<IReadOnlyList<T>> output = new Result<IReadOnlyList<T>>.Ok(values);
+
+        RailwayLogging.Logger?.LogOperation("Sequence", input, output, timer.GetElapsed());
+
+        return output;
     }
 
     /// <summary>
@@ -222,11 +235,14 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(results);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<T> values = new List<T>();
         List<Error> errors = new List<Error>();
 
         foreach (Result<T> result in results)
         {
+            ArgumentNullException.ThrowIfNull(result);
             if (result is Result<T>.Ok ok)
             {
                 values.Add(ok.Value);
@@ -240,10 +256,16 @@ public static class ResultCollectionExtensions
 
         if (errors.Count > 0)
         {
-            return Error.Aggregate(errors);
+            Result<IReadOnlyList<T>> failureOutput = new Result<IReadOnlyList<T>>.Fail(Error.Aggregate(errors));
+            RailwayLogging.Logger?.LogOperation("SequenceAll", input, failureOutput, timer.GetElapsed());
+            return failureOutput;
         }
 
-        return values;
+        Result<IReadOnlyList<T>> output = new Result<IReadOnlyList<T>>.Ok(values);
+
+        RailwayLogging.Logger?.LogOperation("SequenceAll", input, output, timer.GetElapsed());
+
+        return output;
     }
 
     /// <summary>
@@ -258,11 +280,15 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(resultTasks);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<T> values = new List<T>();
 
         foreach (Task<Result<T>> resultTask in resultTasks)
         {
+            ArgumentNullException.ThrowIfNull(resultTask);
             Result<T> result = await resultTask.ConfigureAwait(false);
+            result = RailwayContracts.Output(result);
 
             if (result is Result<T>.Ok ok)
             {
@@ -271,11 +297,17 @@ public static class ResultCollectionExtensions
             else
             {
                 Result<T>.Fail fail = (Result<T>.Fail)result;
-                return fail.Error;
+                Result<IReadOnlyList<T>> failureOutput = new Result<IReadOnlyList<T>>.Fail(fail.Error);
+                RailwayLogging.Logger?.LogOperation("SequenceAsync", input, failureOutput, timer.GetElapsed());
+                return failureOutput;
             }
         }
 
-        return values;
+        Result<IReadOnlyList<T>> output = new Result<IReadOnlyList<T>>.Ok(values);
+
+        RailwayLogging.Logger?.LogOperation("SequenceAsync", input, output, timer.GetElapsed());
+
+        return output;
     }
 
     /// <summary>
@@ -290,12 +322,16 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(resultTasks);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<T> values = new List<T>();
         List<Error> errors = new List<Error>();
 
         foreach (Task<Result<T>> resultTask in resultTasks)
         {
+            ArgumentNullException.ThrowIfNull(resultTask);
             Result<T> result = await resultTask.ConfigureAwait(false);
+            result = RailwayContracts.Output(result);
 
             if (result is Result<T>.Ok ok)
             {
@@ -310,10 +346,16 @@ public static class ResultCollectionExtensions
 
         if (errors.Count > 0)
         {
-            return Error.Aggregate(errors);
+            Result<IReadOnlyList<T>> failureOutput = new Result<IReadOnlyList<T>>.Fail(Error.Aggregate(errors));
+            RailwayLogging.Logger?.LogOperation("SequenceAllAsync", input, failureOutput, timer.GetElapsed());
+            return failureOutput;
         }
 
-        return values;
+        Result<IReadOnlyList<T>> output = new Result<IReadOnlyList<T>>.Ok(values);
+
+        RailwayLogging.Logger?.LogOperation("SequenceAllAsync", input, output, timer.GetElapsed());
+
+        return output;
     }
 
     /// <summary>
@@ -332,6 +374,7 @@ public static class ResultCollectionExtensions
 
         foreach (Result<T> result in results)
         {
+            ArgumentNullException.ThrowIfNull(result);
             if (result is Result<T>.Ok ok)
             {
                 successes.Add(ok.Value);
@@ -360,6 +403,7 @@ public static class ResultCollectionExtensions
 
         foreach (Result<T> result in results)
         {
+            ArgumentNullException.ThrowIfNull(result);
             if (result is Result<T>.Ok ok)
             {
                 values.Add(ok.Value);
@@ -411,8 +455,9 @@ public static class ResultCollectionExtensions
 
                 TIn item = enumerator.Current;
                 cancellationToken.ThrowIfCancellationRequested();
-                Result<TOut> result = await selector(item, cancellationToken).ConfigureAwait(false);
+                Result<TOut> result = await RailwayContracts.Output(selector(item, cancellationToken)).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
+                result = RailwayContracts.Output(result);
 
                 if (result is Result<TOut>.Ok ok)
                 {
@@ -477,8 +522,9 @@ public static class ResultCollectionExtensions
 
                 TIn item = enumerator.Current;
                 cancellationToken.ThrowIfCancellationRequested();
-                Result<TOut> result = await selector(item, cancellationToken).ConfigureAwait(false);
+                Result<TOut> result = await RailwayContracts.Output(selector(item, cancellationToken)).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
+                result = RailwayContracts.Output(result);
 
                 if (result is Result<TOut>.Ok ok)
                 {
@@ -515,6 +561,8 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(resultTasks);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<T> values = new List<T>();
         Error? firstError = null;
         cancellationToken.ThrowIfCancellationRequested();
@@ -529,8 +577,9 @@ public static class ResultCollectionExtensions
                 }
 
                 // MoveNext or Current may start this task; do not abandon its normal await.
-                Result<T> result = await enumerator.Current.ConfigureAwait(false);
+                Result<T> result = await (enumerator.Current ?? throw new ArgumentNullException("resultTasks")).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
+                result = RailwayContracts.Output(result);
                 if (result is Result<T>.Ok ok)
                 {
                     values.Add(ok.Value);
@@ -545,9 +594,11 @@ public static class ResultCollectionExtensions
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return firstError is not null
+        Result<IReadOnlyList<T>> output = firstError is not null
             ? new Result<IReadOnlyList<T>>.Fail(firstError)
             : new Result<IReadOnlyList<T>>.Ok(values);
+        RailwayLogging.Logger?.LogOperation("SequenceAsync", input, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>Sequences supplied tasks in input order with one governing cancellation token.</summary>
@@ -564,6 +615,8 @@ public static class ResultCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(resultTasks);
 
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<T> values = new List<T>();
         List<Error> errors = new List<Error>();
         cancellationToken.ThrowIfCancellationRequested();
@@ -578,8 +631,9 @@ public static class ResultCollectionExtensions
                 }
 
                 // MoveNext or Current may start this task; do not abandon its normal await.
-                Result<T> result = await enumerator.Current.ConfigureAwait(false);
+                Result<T> result = await (enumerator.Current ?? throw new ArgumentNullException("resultTasks")).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
+                result = RailwayContracts.Output(result);
                 if (result is Result<T>.Ok ok)
                 {
                     values.Add(ok.Value);
@@ -593,8 +647,10 @@ public static class ResultCollectionExtensions
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return errors.Count > 0
+        Result<IReadOnlyList<T>> output = errors.Count > 0
             ? new Result<IReadOnlyList<T>>.Fail(Error.Aggregate(errors))
             : new Result<IReadOnlyList<T>>.Ok(values);
+        RailwayLogging.Logger?.LogOperation("SequenceAllAsync", input, output, timer.GetElapsed());
+        return output;
     }
 }

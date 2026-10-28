@@ -11,13 +11,26 @@ public static class ResultMatchExtensions
         this global::System.Threading.Tasks.Task<Result<T>> unionTask,
         global::System.Func<Result<T>.Ok, TMatchOutput> @ok,
         global::System.Func<Result<T>.Fail, TMatchOutput> @fail
-    ) => (await unionTask.ConfigureAwait(false)).Match(@ok, @fail);
+    )
+    {
+        ArgumentNullException.ThrowIfNull(unionTask);
+        ArgumentNullException.ThrowIfNull(@ok);
+        ArgumentNullException.ThrowIfNull(@fail);
+        Result<T> result = RailwayContracts.Output(await unionTask.ConfigureAwait(false));
+        return result.Match(@ok, @fail);
+    }
 
     public static async global::System.Threading.Tasks.ValueTask<TMatchOutput> MatchAsync<TMatchOutput, T>(
         this global::System.Threading.Tasks.ValueTask<Result<T>> unionTask,
         global::System.Func<Result<T>.Ok, TMatchOutput> @ok,
         global::System.Func<Result<T>.Fail, TMatchOutput> @fail
-    ) => (await unionTask.ConfigureAwait(false)).Match(@ok, @fail);
+    )
+    {
+        ArgumentNullException.ThrowIfNull(@ok);
+        ArgumentNullException.ThrowIfNull(@fail);
+        Result<T> result = RailwayContracts.Output(await unionTask.ConfigureAwait(false));
+        return result.Match(@ok, @fail);
+    }
 
     /// <summary>Matches the selected track with a token-aware handler.</summary>
     /// <typeparam name="TMatchOutput">The TMatchOutput type.</typeparam>
@@ -37,6 +50,7 @@ public static class ResultMatchExtensions
         Func<Result<T>.Fail, CancellationToken, Task<TMatchOutput>> fail,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(ok);
         ArgumentNullException.ThrowIfNull(fail);
 
@@ -44,11 +58,11 @@ public static class ResultMatchExtensions
         TMatchOutput output;
         if (result is Result<T>.Ok success)
         {
-            output = await ok(success, cancellationToken).ConfigureAwait(false);
+            output = await RailwayContracts.Output(ok(success, cancellationToken)).ConfigureAwait(false);
         }
         else
         {
-            output = await fail((Result<T>.Fail)result, cancellationToken).ConfigureAwait(false);
+            output = await RailwayContracts.Output(fail((Result<T>.Fail)result, cancellationToken)).ConfigureAwait(false);
         }
         cancellationToken.ThrowIfCancellationRequested();
         return output;
@@ -72,11 +86,13 @@ public static class ResultMatchExtensions
         Func<Result<T>.Fail, CancellationToken, Task<TMatchOutput>> fail,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(unionTask);
         ArgumentNullException.ThrowIfNull(ok);
         ArgumentNullException.ThrowIfNull(fail);
 
         Result<T> result = await unionTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         return await result.MatchAsync(ok, fail, cancellationToken).ConfigureAwait(false);
     }
 
@@ -98,11 +114,13 @@ public static class ResultMatchExtensions
         Func<Result<T>.Fail, CancellationToken, TMatchOutput> fail,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(unionTask);
         ArgumentNullException.ThrowIfNull(ok);
         ArgumentNullException.ThrowIfNull(fail);
 
         Result<T> result = await unionTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         TMatchOutput output;
         if (result is Result<T>.Ok success)
         {

@@ -1,4 +1,4 @@
-﻿namespace Railway.Toolkit
+namespace Railway.Toolkit
 {
     /// <summary>
     /// Represents the result of an operation that can either succeed with a value or fail with an error.
@@ -15,6 +15,16 @@
         /// <summary>
         /// Represents a failed result containing an error.
         /// </summary>
-        public partial record Fail(Error Error);
+        public partial record Fail(Error Error)
+        {
+            private Error _error = Error ?? throw new ArgumentNullException(nameof(Error));
+
+            /// <summary>The non-null error describing this failure.</summary>
+            public Error Error
+            {
+                get => _error;
+                init => _error = value ?? throw new ArgumentNullException(nameof(Error));
+            }
+        }
     }
 }

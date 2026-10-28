@@ -227,8 +227,8 @@ public class UnifiedCancellationTests
         await Assert.ThrowsAsync<ArgumentNullException>(() => ResultCollectionExtensions.SequenceAllAsync<int>(null!, token));
         await Assert.ThrowsAsync<ArgumentNullException>(() => ResultCombineExtensions.CombineAsync<int>(token, null!));
         await Assert.ThrowsAsync<ArgumentNullException>(() => ResultCombineExtensions.CombineAllAsync<int>(token, null!));
-        await Assert.ThrowsAsync<ArgumentException>(() => ResultCombineExtensions.CombineAsync<int>(token, new Task<Result<int>>[] { null! }));
-        await Assert.ThrowsAsync<ArgumentException>(() => ResultCombineExtensions.CombineAllAsync<int>(token, new Task<Result<int>>[] { null! }));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => ResultCombineExtensions.CombineAsync<int>(token, new Task<Result<int>>[] { null! }));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => ResultCombineExtensions.CombineAllAsync<int>(token, new Task<Result<int>>[] { null! }));
         Task<Result<int>> never = new TaskCompletionSource<Result<int>>().Task;
         await Assert.ThrowsAsync<ArgumentNullException>(() => never.ZipAsync<int, int>(null!, token));
         await Assert.ThrowsAsync<ArgumentNullException>(() => never.ZipAsync<int, int, int>(never, null!, token));

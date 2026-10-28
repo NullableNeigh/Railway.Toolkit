@@ -20,6 +20,7 @@ public static class ResultBindExtensions
         this Result<TIn> result,
         Func<TIn, Result<TOut>> binder)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(binder);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -29,6 +30,7 @@ public static class ResultBindExtensions
         if (result is Result<TIn>.Ok ok)
         {
             output = binder(ok.Value);
+            output = RailwayContracts.Output(output);
         }
         else
         {
@@ -52,10 +54,28 @@ public static class ResultBindExtensions
         this Task<Result<TIn>> resultTask,
         Func<TIn, Result<TOut>> binder)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(binder);
 
         Result<TIn> result = await resultTask.ConfigureAwait(false);
-        return result.Bind(binder);
+        result = RailwayContracts.Output(result);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
+        {
+            output = binder(ok.Value);
+            output = RailwayContracts.Output(output);
+        }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("BindAsync", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -70,6 +90,7 @@ public static class ResultBindExtensions
         this Result<TIn> result,
         Func<TIn, Task<Result<TOut>>> binder)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(binder);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -78,7 +99,8 @@ public static class ResultBindExtensions
 
         if (result is Result<TIn>.Ok ok)
         {
-            output = await binder(ok.Value).ConfigureAwait(false);
+            output = await RailwayContracts.Output(binder(ok.Value)).ConfigureAwait(false);
+            output = RailwayContracts.Output(output);
         }
         else
         {
@@ -102,9 +124,11 @@ public static class ResultBindExtensions
         this Task<Result<TIn>> resultTask,
         Func<TIn, Task<Result<TOut>>> binder)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(binder);
 
         Result<TIn> result = await resultTask.ConfigureAwait(false);
+        result = RailwayContracts.Output(result);
         return await result.BindAsync(binder).ConfigureAwait(false);
     }
 
@@ -128,6 +152,7 @@ public static class ResultBindExtensions
         Func<TIn, CancellationToken, Task<Result<TOut>>> binder,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(binder);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -137,8 +162,9 @@ public static class ResultBindExtensions
         if (result is Result<TIn>.Ok ok)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            output = await binder(ok.Value, cancellationToken).ConfigureAwait(false);
+            output = await RailwayContracts.Output(binder(ok.Value, cancellationToken)).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
+            output = RailwayContracts.Output(output);
         }
         else
         {
@@ -170,10 +196,12 @@ public static class ResultBindExtensions
         Func<TIn, CancellationToken, Task<Result<TOut>>> binder,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(binder);
 
         Result<TIn> result = await resultTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         return await result.BindAsync(binder, cancellationToken).ConfigureAwait(false);
     }
 
@@ -193,10 +221,12 @@ public static class ResultBindExtensions
         Func<TIn, CancellationToken, Result<TOut>> binder,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(binder);
 
         Result<TIn> result = await resultTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<TOut> output;
         if (result is Result<TIn>.Ok ok)
@@ -204,13 +234,14 @@ public static class ResultBindExtensions
             cancellationToken.ThrowIfCancellationRequested();
             output = binder(ok.Value, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
+            output = RailwayContracts.Output(output);
         }
         else
         {
             output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
         }
 
-        RailwayLogging.Logger?.LogOperation("Bind", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("BindAsync", result, output, timer.GetElapsed());
         return output;
     }
 }

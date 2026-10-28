@@ -79,12 +79,12 @@ public class RailwayPatternTests
     }
 
     [Fact]
-    public void Recover_SwitchesBackToSuccessTrack()
+    public void OrElse_SwitchesBackToSuccessTrack()
     {
-        // Recover can switch from failure back to success track
+        // OrElse can switch from failure back to success track
         Result<int> result = Railway.Start(5)
             .Bind(x => Result.Fail<int>("Error", "ERR"))
-            .Recover(0)
+            .OrElse(0)
             .Map(x => x + 10);
 
         Assert.Equal(10, result.Match(ok => ok.Value, fail => -1));

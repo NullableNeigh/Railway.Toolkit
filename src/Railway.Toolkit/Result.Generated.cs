@@ -22,7 +22,12 @@ abstract partial record Result<T>
         public override TMatchOutput Match<TMatchOutput>(
             global::System.Func<Ok, TMatchOutput> @ok,
             global::System.Func<Fail, TMatchOutput> @fail
-        ) => @ok(this);
+        )
+        {
+            ArgumentNullException.ThrowIfNull(@ok);
+            ArgumentNullException.ThrowIfNull(@fail);
+            return @ok(this);
+        }
     }
 
     public sealed partial record Fail : Result<T>
@@ -30,7 +35,12 @@ abstract partial record Result<T>
         public override TMatchOutput Match<TMatchOutput>(
             global::System.Func<Ok, TMatchOutput> @ok,
             global::System.Func<Fail, TMatchOutput> @fail
-        ) => @fail(this);
+        )
+        {
+            ArgumentNullException.ThrowIfNull(@ok);
+            ArgumentNullException.ThrowIfNull(@fail);
+            return @fail(this);
+        }
     }
 }
 

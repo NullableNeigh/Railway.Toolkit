@@ -14,6 +14,8 @@ public static class ResultValidationExtensions
         this Result<string> result,
         string fieldName = "Value")
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<string> output = ValidateField(result, v => !string.IsNullOrEmpty(v), fieldName, "cannot be null or empty", "Validation.Required");
         RailwayLogging.Logger?.LogOperation("NotNullOrEmpty", result, output, timer.GetElapsed());
@@ -27,6 +29,8 @@ public static class ResultValidationExtensions
         this Result<string> result,
         string fieldName = "Value")
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<string> output = ValidateField(result, v => !string.IsNullOrWhiteSpace(v), fieldName, "cannot be null, empty, or whitespace", "Validation.Required");
         RailwayLogging.Logger?.LogOperation("NotNullOrWhiteSpace", result, output, timer.GetElapsed());
@@ -41,6 +45,8 @@ public static class ResultValidationExtensions
         int minLength,
         string fieldName = "Value")
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<string> output = ValidateField(result, v => v != null && v.Length >= minLength, fieldName, $"must be at least {minLength} characters", "Validation.Length");
         RailwayLogging.Logger?.LogOperation("HasMinLength", result, output, timer.GetElapsed());
@@ -55,6 +61,8 @@ public static class ResultValidationExtensions
         int maxLength,
         string fieldName = "Value")
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<string> output = ValidateField(result, v => v == null || v.Length <= maxLength, fieldName, $"must not exceed {maxLength} characters", "Validation.Length");
         RailwayLogging.Logger?.LogOperation("HasMaxLength", result, output, timer.GetElapsed());
@@ -70,6 +78,8 @@ public static class ResultValidationExtensions
         string fieldName = "Value")
         where T : IComparable<T>
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<T> output = ValidateField(result, v => v.CompareTo(minimum) > 0, fieldName, $"must be greater than {minimum}", "Validation.Range");
         RailwayLogging.Logger?.LogOperation("GreaterThan", result, output, timer.GetElapsed());
@@ -85,6 +95,8 @@ public static class ResultValidationExtensions
         string fieldName = "Value")
         where T : IComparable<T>
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<T> output = ValidateField(result, v => v.CompareTo(maximum) < 0, fieldName, $"must be less than {maximum}", "Validation.Range");
         RailwayLogging.Logger?.LogOperation("LessThan", result, output, timer.GetElapsed());
@@ -101,6 +113,8 @@ public static class ResultValidationExtensions
         string fieldName = "Value")
         where T : IComparable<T>
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<T> output = ValidateField(result, v => v.CompareTo(min) >= 0 && v.CompareTo(max) <= 0, fieldName, $"must be between {min} and {max}", "Validation.Range");
         RailwayLogging.Logger?.LogOperation("InRange", result, output, timer.GetElapsed());
@@ -114,6 +128,8 @@ public static class ResultValidationExtensions
         this Result<int> result,
         string fieldName = "Value")
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<int> output = ValidateField(result, v => v > 0, fieldName, "must be greater than zero", "Validation.Range");
         RailwayLogging.Logger?.LogOperation("GreaterThanZero", result, output, timer.GetElapsed());
@@ -127,6 +143,8 @@ public static class ResultValidationExtensions
         this Result<decimal> result,
         string fieldName = "Value")
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<decimal> output = ValidateField(result, v => v > 0m, fieldName, "must be greater than zero", "Validation.Range");
         RailwayLogging.Logger?.LogOperation("GreaterThanZero", result, output, timer.GetElapsed());
@@ -140,6 +158,8 @@ public static class ResultValidationExtensions
         this Result<IEnumerable<T>> result,
         string fieldName = "Value")
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<IEnumerable<T>> output = ValidateField(result, v => v != null && v.Any(), fieldName, "cannot be null or empty", "Validation.Required");
         RailwayLogging.Logger?.LogOperation("NotNullOrEmpty", result, output, timer.GetElapsed());
@@ -154,6 +174,8 @@ public static class ResultValidationExtensions
         int minCount,
         string fieldName = "Value")
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<IEnumerable<T>> output = ValidateField(result, v => v != null && v.Count() >= minCount, fieldName, $"must contain at least {minCount} items", "Validation.Count");
         RailwayLogging.Logger?.LogOperation("HasMinCount", result, output, timer.GetElapsed());
@@ -168,6 +190,8 @@ public static class ResultValidationExtensions
         int maxCount,
         string fieldName = "Value")
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<IEnumerable<T>> output = ValidateField(result, v => v == null || v.Count() <= maxCount, fieldName, $"must not contain more than {maxCount} items", "Validation.Count");
         RailwayLogging.Logger?.LogOperation("HasMaxCount", result, output, timer.GetElapsed());

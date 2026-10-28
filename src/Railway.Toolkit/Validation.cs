@@ -44,6 +44,7 @@ public static class Validation
 
         foreach (Result<Unit> validation in validationResults)
         {
+            ArgumentNullException.ThrowIfNull(validation);
             if (validation is Result<Unit>.Fail fail)
             {
                 hasErrors = true;

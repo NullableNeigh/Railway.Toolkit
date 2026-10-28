@@ -36,9 +36,48 @@ Once on the failure track, operations are skipped (short-circuited) until you ex
 - **Tap** - Side effects without breaking the chain
 - **Ensure** - Validation with automatic track switching
 - **Try** - Wrap exception-throwing code
-- **Recover** - Handle errors and return to success track
+- **OrElse / OrElseWith** - Supply a successful fallback value or an alternative Result
 - **Combine** - Work with multiple Results
 - **Traverse/Sequence** - Collection operations
+
+### Fallbacks, exception mapping and nulls
+
+`OrElse` turns a failure into a successful fallback value. `OrElseWith` supplies another
+`Result<T>`, which may succeed or fail. Both skip fallback callbacks on success. Their
+`Async` forms support asynchronous fallback callbacks and `Task<Result<T>>` pipelines.
+
+`TryMapAsync` and `TryBindAsync` also accept incoming result tasks. They convert exceptions
+from the supplied callback; faults from the incoming task propagate. All Try operations
+accept an optional `exceptionMapper` to construct the complete application `Error`.
+When supplied, that mapper owns the message, code and exception retention; `errorCode`
+applies only to default conversion. Mapper exceptions propagate.
+
+```csharp
+Result<int> parsed = ResultTryExtensions.Try(
+    () => int.Parse("invalid"),
+    exceptionMapper: exception => Error.Create("Invalid number", "Input.InvalidNumber"));
+
+Result<int> fallback = await Task.FromResult(parsed)
+    .OrElseWithAsync(error => Task.FromResult(Result.Ok(0)));
+```
+
+Cancellation-aware overloads forward the governing token and observe it before and
+after selected callbacks and after normal incoming awaits. Direct successful results
+skip failure-track cancellation checks. Incoming tasks are awaited normally; fallback
+does not catch incoming faults or retrofit cancellation into work already started.
+Tokenless Try operations propagate cancellation exceptions. Token-aware Try operations
+propagate them when their governing token is requested, and otherwise convert them.
+
+Nullable success values are allowed. Required results, tasks, errors and callbacks must
+not be null. Null callback-produced results, errors or tasks throw `InvalidOperationException`
+outside Try conversion. Null arguments throw `ArgumentNullException`, including `Fail`
+construction and `with` updates. `EnsureNotNull` remains an explicit validation choice.
+
+`CombineAsync` awaits the supplied task group before combining railway results;
+`SequenceAsync` enumerates and awaits in order and may stop before reaching later tasks.
+Already-started unreached tasks remain the caller's responsibility. Their `All` variants
+collect railway errors. The composition operations emit one completion event, subject
+to configured logging filters; exceptions and cancellation emit no output-result event.
 
 ## Installation
 
@@ -70,7 +109,7 @@ var apiResult = await Railway.Start(userId)
     .BindAsync(FetchUserAsync)
     .MapAsync(user => user.ToDto())
     .TapAsync(dto => LogAsync(dto))
-    .RecoverWith(Result.Ok(DefaultUserDto));
+    .OrElseWithAsync(Result.Ok(DefaultUserDto));
 ```
 
 ## Core Concepts
@@ -377,8 +416,8 @@ Return to success track after error:
 ```csharp
 var result = Railway.Start(userId)
     .Bind(FetchUser)
-    .Recover(GetDefaultUser()) // Use default on failure
-    .RecoverWith(error =>
+    .OrElse(GetDefaultUser()) // Use default on failure
+    .OrElseWith(error =>
         error.Code == "NOT_FOUND"
             ? Result.Ok(GuestUser)
             : Result.Fail<User>(error)
@@ -460,9 +499,9 @@ public async Task<Result<UserDto>> GetUserAsync(int userId)
         .Ensure(id => id > 0, "Invalid user ID", "INVALID_ID")
         .BindAsync(id => FetchUserFromDbAsync(id))
         .TapAsync(user => LogAsync($"Fetched user {user.Id}"))
-        .Ensure(user => user.IsActive, "User is inactive", "INACTIVE_USER")
+        .EnsureAsync(user => user.IsActive, "User is inactive", "INACTIVE_USER")
         .MapAsync(user => MapToDtoAsync(user))
-        .RecoverWith(error =>
+        .OrElseWithAsync(error =>
             error.Code == "NOT_FOUND"
                 ? Result.Ok(GetGuestDto())
                 : Result.Fail<UserDto>(error)

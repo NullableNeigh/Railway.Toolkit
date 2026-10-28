@@ -13,6 +13,8 @@ public static class ResultUtilityExtensions
     /// </summary>
     public static Result<Unit> ToUnit<T>(this Result<T> result)
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         if (result is Result<T>.Ok)
         {
             return new Result<Unit>.Ok(Unit.Value);

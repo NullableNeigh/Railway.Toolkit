@@ -19,6 +19,7 @@ public static class ResultMapExtensions
         this Result<TIn> result,
         Func<TIn, TOut> mapper)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(mapper);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -52,10 +53,27 @@ public static class ResultMapExtensions
         this Task<Result<TIn>> resultTask,
         Func<TIn, TOut> mapper)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(mapper);
 
         Result<TIn> result = await resultTask.ConfigureAwait(false);
-        return result.Map(mapper);
+        result = RailwayContracts.Output(result);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<TOut> output;
+
+        if (result is Result<TIn>.Ok ok)
+        {
+            output = new Result<TOut>.Ok(mapper(ok.Value));
+        }
+        else
+        {
+            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
+            output = new Result<TOut>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("MapAsync", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -71,6 +89,7 @@ public static class ResultMapExtensions
         this Result<TIn> result,
         Func<TIn, Task<TOut>> mapper)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(mapper);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -79,7 +98,7 @@ public static class ResultMapExtensions
 
         if (result is Result<TIn>.Ok ok)
         {
-            TOut mapped = await mapper(ok.Value).ConfigureAwait(false);
+            TOut mapped = await RailwayContracts.Output(mapper(ok.Value)).ConfigureAwait(false);
             output = new Result<TOut>.Ok(mapped);
         }
         else
@@ -105,9 +124,11 @@ public static class ResultMapExtensions
         this Task<Result<TIn>> resultTask,
         Func<TIn, Task<TOut>> mapper)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(mapper);
 
         Result<TIn> result = await resultTask.ConfigureAwait(false);
+        result = RailwayContracts.Output(result);
         return await result.MapAsync(mapper).ConfigureAwait(false);
     }
 
@@ -132,6 +153,7 @@ public static class ResultMapExtensions
         Func<TIn, CancellationToken, Task<TOut>> mapper,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(mapper);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
@@ -141,7 +163,7 @@ public static class ResultMapExtensions
         if (result is Result<TIn>.Ok ok)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            TOut mapped = await mapper(ok.Value, cancellationToken).ConfigureAwait(false);
+            TOut mapped = await RailwayContracts.Output(mapper(ok.Value, cancellationToken)).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             output = new Result<TOut>.Ok(mapped);
         }
@@ -176,10 +198,12 @@ public static class ResultMapExtensions
         Func<TIn, CancellationToken, Task<TOut>> mapper,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(mapper);
 
         Result<TIn> result = await resultTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         return await result.MapAsync(mapper, cancellationToken).ConfigureAwait(false);
     }
 
@@ -199,10 +223,12 @@ public static class ResultMapExtensions
         Func<TIn, CancellationToken, TOut> mapper,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(mapper);
 
         Result<TIn> result = await resultTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<TOut> output;
         if (result is Result<TIn>.Ok ok)
@@ -217,7 +243,7 @@ public static class ResultMapExtensions
             output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
         }
 
-        RailwayLogging.Logger?.LogOperation("Map", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("MapAsync", result, output, timer.GetElapsed());
         return output;
     }
 }

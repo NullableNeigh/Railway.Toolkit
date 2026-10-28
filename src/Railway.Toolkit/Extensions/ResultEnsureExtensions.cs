@@ -21,6 +21,7 @@ public static class ResultEnsureExtensions
         Func<T, bool> predicate,
         Error error)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
@@ -58,18 +59,18 @@ public static class ResultEnsureExtensions
         Func<T, bool> predicate,
         Func<T, Error> errorFactory)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(errorFactory);
 
-        if (result is Result<T>.Ok ok)
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<T> output = result;
+        if (result is Result<T>.Ok ok && !predicate(ok.Value))
         {
-            return predicate(ok.Value)
-                ? new Result<T>.Ok(ok.Value)
-                : new Result<T>.Fail(errorFactory(ok.Value));
+            output = new Result<T>.Fail(RailwayContracts.Output(errorFactory(ok.Value)));
         }
-
-        Result<T>.Fail fail = (Result<T>.Fail)result;
-        return new Result<T>.Fail(fail.Error);
+        RailwayLogging.Logger?.LogOperation("Ensure", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -89,6 +90,7 @@ public static class ResultEnsureExtensions
         string errorCode = "ValidationError",
         IReadOnlyDictionary<string, string[]>? details = null)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(errorMessage);
 
@@ -109,11 +111,30 @@ public static class ResultEnsureExtensions
         Func<T, bool> predicate,
         Error error)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
-        return result.Ensure(predicate, error);
+        result = RailwayContracts.Output(result);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+
+        Result<T> output;
+
+        if (result is Result<T>.Ok ok)
+        {
+            output = predicate(ok.Value)
+                ? new Result<T>.Ok(ok.Value)
+                : new Result<T>.Fail(error);
+        }
+        else
+        {
+            Result<T>.Fail fail = (Result<T>.Fail)result;
+            output = new Result<T>.Fail(fail.Error);
+        }
+
+        RailwayLogging.Logger?.LogOperation("EnsureAsync", result, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -129,6 +150,7 @@ public static class ResultEnsureExtensions
         Func<T, Task<bool>> predicate,
         Error error)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
@@ -138,7 +160,7 @@ public static class ResultEnsureExtensions
 
         if (result is Result<T>.Ok ok)
         {
-            output = await predicate(ok.Value).ConfigureAwait(false)
+            output = await RailwayContracts.Output(predicate(ok.Value)).ConfigureAwait(false)
                 ? new Result<T>.Ok(ok.Value)
                 : new Result<T>.Fail(error);
         }
@@ -165,10 +187,12 @@ public static class ResultEnsureExtensions
         Func<T, Task<bool>> predicate,
         Error error)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
+        result = RailwayContracts.Output(result);
         return await result.EnsureAsync(predicate, error).ConfigureAwait(false);
     }
 
@@ -186,6 +210,8 @@ public static class ResultEnsureExtensions
         string errorMessage = "Value cannot be null",
         string errorCode = "NullValue")
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         return result.Ensure(
             value => value is not null,
             errorMessage,
@@ -205,15 +231,24 @@ public static class ResultEnsureExtensions
         this Result<T> result,
         params (Func<T, bool> Predicate, Error Error)[] validations)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(validations);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
 
-        Result<T> output = result;
-
         foreach ((Func<T, bool>? predicate, Error? error) in validations)
         {
-            output = output.Ensure(predicate, error);
+            ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(error);
+        }
+
+        Result<T> output = result;
+        foreach ((Func<T, bool> predicate, Error error) in validations)
+        {
+            if (output is Result<T>.Ok ok && !predicate(ok.Value))
+            {
+                output = new Result<T>.Fail(error);
+            }
 
             if (output is Result<T>.Fail)
             {
@@ -246,6 +281,7 @@ public static class ResultEnsureExtensions
         Error error,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
@@ -256,7 +292,7 @@ public static class ResultEnsureExtensions
         if (result is Result<T>.Ok ok)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            bool valid = await predicate(ok.Value, cancellationToken).ConfigureAwait(false);
+            bool valid = await RailwayContracts.Output(predicate(ok.Value, cancellationToken)).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             output = valid
                 ? new Result<T>.Ok(ok.Value)
@@ -293,11 +329,13 @@ public static class ResultEnsureExtensions
         Error error,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         return await result.EnsureAsync(predicate, error, cancellationToken).ConfigureAwait(false);
     }
 
@@ -318,11 +356,13 @@ public static class ResultEnsureExtensions
         Error error,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(resultTask);
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentNullException.ThrowIfNull(error);
 
         Result<T> result = await resultTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<T> output = result;
         if (result is Result<T>.Ok ok)
@@ -333,7 +373,7 @@ public static class ResultEnsureExtensions
             output = valid ? result : new Result<T>.Fail(error);
         }
 
-        RailwayLogging.Logger?.LogOperation("Ensure", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("EnsureAsync", result, output, timer.GetElapsed());
         return output;
     }
 }

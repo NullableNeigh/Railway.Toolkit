@@ -1,485 +1,1164 @@
 namespace Railway.Toolkit;
 
-/// <summary>
-/// Extension methods for wrapping exception-throwing code into Results.
-/// Try operations convert exceptions into functional Result-based code according to their cancellation policy.
-/// </summary>
+/// <summary>Converts exceptions from the supplied operation into errors. Incoming task faults propagate.</summary>
 public static class ResultTryExtensions
 {
-    /// <summary>
-    /// Executes a function and converts non-cancellation exceptions to a Result.
-    /// </summary>
-    /// <typeparam name="T">The return type of the function.</typeparam>
-    /// <param name="func">The function to execute.</param>
-    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
-    /// <returns>Ok with the function result, or Fail with a non-cancellation exception converted to an Error.</returns>
+    /// <summary>Runs the supplied function operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="T">The T value type.</typeparam>
+    /// <param name="func">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
     public static Result<T> Try<T>(
         Func<T> func,
-        string? errorCode = null)
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
     {
         ArgumentNullException.ThrowIfNull(func);
-
         using IRailwayTimer timer = RailwayLogging.StartOperation();
-
-        // Static Try has no Result input — use Unit to represent "starting fresh"
         Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         Result<T> output;
-
+        Exception? caught = null;
+        T returned = default!;
         try
         {
-            output = new Result<T>.Ok(func());
+            returned = func();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            output = new Result<T>.Fail(Error.FromException(ex, errorCode));
+            caught = ex;
         }
-
+        if (caught is not null)
+        {
+            Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+            output = new Result<T>.Fail(error);
+        }
+        else
+        {
+            output = new Result<T>.Ok(returned);
+        }
         RailwayLogging.Logger?.LogOperation("Try", input, output, timer.GetElapsed());
         return output;
     }
 
-    /// <summary>
-    /// Executes an asynchronous function and converts non-cancellation exceptions to a Result.
-    /// </summary>
-    /// <typeparam name="T">The return type of the function.</typeparam>
-    /// <param name="func">The async function to execute.</param>
-    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
-    /// <returns>A task containing Ok with the function result, or Fail with a non-cancellation exception.</returns>
+    /// <summary>Runs the supplied function operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="T">The T value type.</typeparam>
+    /// <param name="func">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
     public static async Task<Result<T>> TryAsync<T>(
         Func<Task<T>> func,
-        string? errorCode = null)
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
     {
         ArgumentNullException.ThrowIfNull(func);
-
         using IRailwayTimer timer = RailwayLogging.StartOperation();
-
         Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         Result<T> output;
-
+        Exception? caught = null;
+        Task<T>? returned = default;
         try
         {
-            output = new Result<T>.Ok(await func().ConfigureAwait(false));
+            returned = func();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            output = new Result<T>.Fail(Error.FromException(ex, errorCode));
+            caught = ex;
         }
-
-        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
-        return output;
-    }
-
-    /// <summary>
-    /// Wraps an action in a Result, returning Unit on success.
-    /// </summary>
-    /// <param name="action">The action to execute.</param>
-    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
-    /// <returns>Ok with Unit if successful, or Fail with a non-cancellation exception converted to an Error.</returns>
-    public static Result<Unit> Try(
-        Action action,
-        string? errorCode = null)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-
-        using IRailwayTimer timer = RailwayLogging.StartOperation();
-
-        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
-        Result<Unit> output;
-
-        try
+        T value = default!;
+        if (caught is null)
         {
-            action();
-            output = new Result<Unit>.Ok(Unit.Value);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            output = new Result<Unit>.Fail(Error.FromException(ex, errorCode));
-        }
-
-        RailwayLogging.Logger?.LogOperation("Try", input, output, timer.GetElapsed());
-        return output;
-    }
-
-    /// <summary>
-    /// Wraps an asynchronous action in a Result, returning Unit on success.
-    /// </summary>
-    /// <param name="action">The async action to execute.</param>
-    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
-    /// <returns>A task containing Ok with Unit if successful, or Fail with a non-cancellation exception.</returns>
-    public static async Task<Result<Unit>> TryAsync(
-        Func<Task> action,
-        string? errorCode = null)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-
-        using IRailwayTimer timer = RailwayLogging.StartOperation();
-
-        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
-        Result<Unit> output;
-
-        try
-        {
-            await action().ConfigureAwait(false);
-            output = new Result<Unit>.Ok(Unit.Value);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            output = new Result<Unit>.Fail(Error.FromException(ex, errorCode));
-        }
-
-        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
-        return output;
-    }
-
-    /// <summary>
-    /// Applies a function to the success value and converts non-cancellation exceptions to failures.
-    /// Combines Map with exception handling.
-    /// </summary>
-    /// <typeparam name="TIn">The input value type.</typeparam>
-    /// <typeparam name="TOut">The output value type.</typeparam>
-    /// <param name="result">The result to map.</param>
-    /// <param name="mapper">The function to apply to the success value.</param>
-    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
-    /// <returns>Ok with the mapped value, or Fail with the error or a non-cancellation exception.</returns>
-    public static Result<TOut> TryMap<TIn, TOut>(
-        this Result<TIn> result,
-        Func<TIn, TOut> mapper,
-        string? errorCode = null)
-    {
-        ArgumentNullException.ThrowIfNull(mapper);
-
-        using IRailwayTimer timer = RailwayLogging.StartOperation();
-
-        Result<TOut> output;
-
-        if (result is Result<TIn>.Ok ok)
-        {
+            Task<T> work = RailwayContracts.Output(returned);
             try
             {
-                output = new Result<TOut>.Ok(mapper(ok.Value));
+                value = await work.ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+                caught = ex;
+            }
+        }
+        if (caught is not null)
+        {
+            Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+            output = new Result<T>.Fail(error);
+        }
+        else
+        {
+            output = new Result<T>.Ok(value);
+        }
+        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied function operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="T">The T value type.</typeparam>
+    /// <param name="func">The callback to invoke on the selected track.</param>
+    /// <param name="cancellationToken">The governing cancellation token.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// Cancellation exceptions propagate when the governing token is requested; otherwise they are mapped. Cancellation is checked before/after work and after incoming awaits.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
+    public static async Task<Result<T>> TryAsync<T>(
+        Func<CancellationToken, Task<T>> func,
+        CancellationToken cancellationToken,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(func);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        Result<T> output;
+        Exception? caught = null;
+        Task<T>? returned = default;
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            returned = func(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            caught = ex;
+        }
+        T value = default!;
+        if (caught is null)
+        {
+            Task<T> work = RailwayContracts.Output(returned);
+            try
+            {
+                value = await work.ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                caught = ex;
+            }
+        }
+        if (caught is not null)
+        {
+            Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+            output = new Result<T>.Fail(error);
+        }
+        else
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            output = new Result<T>.Ok(value);
+        }
+        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied action operation, converting eligible callback exceptions to errors.</summary>
+    /// <param name="action">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
+    public static Result<Unit> Try(
+        Action action,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        Result<Unit> output;
+        Exception? caught = null;
+        try
+        {
+            action();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            caught = ex;
+        }
+        if (caught is not null)
+        {
+            Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+            output = new Result<Unit>.Fail(error);
+        }
+        else
+        {
+            output = new Result<Unit>.Ok(Unit.Value);
+        }
+        RailwayLogging.Logger?.LogOperation("Try", input, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied action operation, converting eligible callback exceptions to errors.</summary>
+    /// <param name="action">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
+    public static async Task<Result<Unit>> TryAsync(
+        Func<Task> action,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        Result<Unit> output;
+        Exception? caught = null;
+        Task? returned = default;
+        try
+        {
+            returned = action();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            caught = ex;
+        }
+        if (caught is null)
+        {
+            Task work = RailwayContracts.Output(returned);
+            try
+            {
+                await work.ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                caught = ex;
+            }
+        }
+        if (caught is not null)
+        {
+            Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+            output = new Result<Unit>.Fail(error);
+        }
+        else
+        {
+            output = new Result<Unit>.Ok(Unit.Value);
+        }
+        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied action operation, converting eligible callback exceptions to errors.</summary>
+    /// <param name="action">The callback to invoke on the selected track.</param>
+    /// <param name="cancellationToken">The governing cancellation token.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// Cancellation exceptions propagate when the governing token is requested; otherwise they are mapped. Cancellation is checked before/after work and after incoming awaits.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
+    public static async Task<Result<Unit>> TryAsync(
+        Func<CancellationToken, Task> action,
+        CancellationToken cancellationToken,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
+        Result<Unit> output;
+        Exception? caught = null;
+        Task? returned = default;
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            returned = action(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            caught = ex;
+        }
+        if (caught is null)
+        {
+            Task work = RailwayContracts.Output(returned);
+            try
+            {
+                await work.ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                caught = ex;
+            }
+        }
+        if (caught is not null)
+        {
+            Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+            output = new Result<Unit>.Fail(error);
+        }
+        else
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            output = new Result<Unit>.Ok(Unit.Value);
+        }
+        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied map operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="result">The incoming result.</param>
+    /// <param name="mapper">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
+    public static Result<TOut> TryMap<TIn, TOut>(
+        this Result<TIn> result,
+        Func<TIn, TOut> mapper,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(mapper);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            Exception? caught = null;
+            TOut returned = default!;
+            try
+            {
+                returned = mapper(ok.Value);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                caught = ex;
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                output = new Result<TOut>.Ok(returned);
             }
         }
         else
         {
-            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
-            output = new Result<TOut>.Fail(fail.Error);
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
         }
-
         RailwayLogging.Logger?.LogOperation("TryMap", result, output, timer.GetElapsed());
         return output;
     }
 
-    /// <summary>
-    /// Applies an asynchronous function to the success value and converts non-cancellation exceptions to failures.
-    /// </summary>
-    /// <typeparam name="TIn">The input value type.</typeparam>
-    /// <typeparam name="TOut">The output value type.</typeparam>
-    /// <param name="result">The result to map.</param>
-    /// <param name="mapper">The async function to apply to the success value.</param>
-    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
-    /// <returns>A task containing Ok with the mapped value, or Fail with the error or a non-cancellation exception.</returns>
+    /// <summary>Runs the supplied map operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="result">The incoming result.</param>
+    /// <param name="mapper">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
     public static async Task<Result<TOut>> TryMapAsync<TIn, TOut>(
         this Result<TIn> result,
         Func<TIn, Task<TOut>> mapper,
-        string? errorCode = null)
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(mapper);
-
         using IRailwayTimer timer = RailwayLogging.StartOperation();
-
         Result<TOut> output;
-
         if (result is Result<TIn>.Ok ok)
         {
+            Exception? caught = null;
+            Task<TOut>? returned = default;
             try
             {
-                output = new Result<TOut>.Ok(await mapper(ok.Value).ConfigureAwait(false));
+                returned = mapper(ok.Value);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+                caught = ex;
+            }
+            TOut value = default!;
+            if (caught is null)
+            {
+                Task<TOut> work = RailwayContracts.Output(returned);
+                try
+                {
+                    value = await work.ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    caught = ex;
+                }
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                output = new Result<TOut>.Ok(value);
             }
         }
         else
         {
-            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
-            output = new Result<TOut>.Fail(fail.Error);
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
         }
-
         RailwayLogging.Logger?.LogOperation("TryMapAsync", result, output, timer.GetElapsed());
         return output;
     }
 
-    /// <summary>
-    /// Applies a binder function to the success value and converts non-cancellation exceptions to failures.
-    /// Combines Bind with exception handling.
-    /// </summary>
-    /// <typeparam name="TIn">The input value type.</typeparam>
-    /// <typeparam name="TOut">The output value type.</typeparam>
-    /// <param name="result">The result to bind.</param>
-    /// <param name="binder">The function that returns a new Result.</param>
-    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
-    /// <returns>The result of the binder, or Fail with the error or a non-cancellation exception.</returns>
-    public static Result<TOut> TryBind<TIn, TOut>(
-        this Result<TIn> result,
-        Func<TIn, Result<TOut>> binder,
-        string? errorCode = null)
-    {
-        ArgumentNullException.ThrowIfNull(binder);
-
-        using IRailwayTimer timer = RailwayLogging.StartOperation();
-
-        Result<TOut> output;
-
-        if (result is Result<TIn>.Ok ok)
-        {
-            try
-            {
-                output = binder(ok.Value);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
-            }
-        }
-        else
-        {
-            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
-            output = new Result<TOut>.Fail(fail.Error);
-        }
-
-        RailwayLogging.Logger?.LogOperation("TryBind", result, output, timer.GetElapsed());
-        return output;
-    }
-
-    /// <summary>
-    /// Applies an asynchronous binder function to the success value and converts non-cancellation exceptions to failures.
-    /// </summary>
-    /// <typeparam name="TIn">The input value type.</typeparam>
-    /// <typeparam name="TOut">The output value type.</typeparam>
-    /// <param name="result">The result to bind.</param>
-    /// <param name="binder">The async function that returns a new Result.</param>
-    /// <param name="errorCode">Optional error code to use when a non-cancellation exception is caught.</param>
-    /// <returns>A task containing the result of the binder, or Fail with the error or a non-cancellation exception.</returns>
-    public static async Task<Result<TOut>> TryBindAsync<TIn, TOut>(
-        this Result<TIn> result,
-        Func<TIn, Task<Result<TOut>>> binder,
-        string? errorCode = null)
-    {
-        ArgumentNullException.ThrowIfNull(binder);
-
-        using IRailwayTimer timer = RailwayLogging.StartOperation();
-
-        Result<TOut> output;
-
-        if (result is Result<TIn>.Ok ok)
-        {
-            try
-            {
-                output = await binder(ok.Value).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
-            }
-        }
-        else
-        {
-            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
-            output = new Result<TOut>.Fail(fail.Error);
-        }
-
-        RailwayLogging.Logger?.LogOperation("TryBindAsync", result, output, timer.GetElapsed());
-        return output;
-    }
-
-    /// <summary>
-    /// Executes an asynchronous function and converts exceptions to a Result, except cancellation requested by the governing token.
-    /// </summary>
-    /// <typeparam name="T">The return type of the function.</typeparam>
-    /// <param name="func">The async function to execute.</param>
-    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
-    /// <param name="errorCode">Optional error code passed to Error.FromException for converted exceptions.</param>
-    /// <returns>A task containing Ok with the function result, or Fail with a converted exception.</returns>
-    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
-    /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
-    /// <remarks>Argument validation precedes cancellation.
-    /// The token is checked before delegate invocation and after normal completion; ordinary faults retain Try conversion.
-    /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
-    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
-    public static async Task<Result<T>> TryAsync<T>(
-        Func<CancellationToken, Task<T>> func,
-        CancellationToken cancellationToken,
-        string? errorCode = null)
-    {
-        ArgumentNullException.ThrowIfNull(func);
-
-        using IRailwayTimer timer = RailwayLogging.StartOperation();
-
-        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
-        Result<T> output;
-
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            T value = await func(cancellationToken).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            output = new Result<T>.Ok(value);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-        {
-            output = new Result<T>.Fail(Error.FromException(ex, errorCode));
-        }
-
-        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
-        return output;
-    }
-
-    /// <summary>
-    /// Wraps an asynchronous action in a Result, returning Unit on success.
-    /// </summary>
-    /// <param name="action">The async action to execute.</param>
-    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
-    /// <param name="errorCode">Optional error code passed to Error.FromException for converted exceptions.</param>
-    /// <returns>A task containing Ok with Unit if successful, or Fail with a converted exception.</returns>
-    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
-    /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
-    /// <remarks>Argument validation precedes cancellation.
-    /// The token is checked before delegate invocation and after normal completion; ordinary faults retain Try conversion.
-    /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
-    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
-    public static async Task<Result<Unit>> TryAsync(
-        Func<CancellationToken, Task> action,
-        CancellationToken cancellationToken,
-        string? errorCode = null)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-
-        using IRailwayTimer timer = RailwayLogging.StartOperation();
-
-        Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
-        Result<Unit> output;
-
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await action(cancellationToken).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            output = new Result<Unit>.Ok(Unit.Value);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-        {
-            output = new Result<Unit>.Fail(Error.FromException(ex, errorCode));
-        }
-
-        RailwayLogging.Logger?.LogOperation("TryAsync", input, output, timer.GetElapsed());
-        return output;
-    }
-
-    /// <summary>
-    /// Applies an asynchronous function to the success value and converts exceptions to failures, except cancellation requested by the governing token.
-    /// </summary>
-    /// <typeparam name="TIn">The input value type.</typeparam>
-    /// <typeparam name="TOut">The output value type.</typeparam>
-    /// <param name="result">The result to map.</param>
-    /// <param name="mapper">The async function to apply to the success value.</param>
-    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
-    /// <param name="errorCode">Optional error code passed to Error.FromException for converted exceptions.</param>
-    /// <returns>A task containing Ok with the mapped value, or Fail with the error or a converted exception.</returns>
-    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
-    /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
-    /// <remarks>Argument validation precedes cancellation.
-    /// Direct Result failures skip the delegate without observing cancellation. The token is checked before delegate invocation and after normal awaits.
-    /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
-    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
+    /// <summary>Runs the supplied map operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="result">The incoming result.</param>
+    /// <param name="mapper">The callback to invoke on the selected track.</param>
+    /// <param name="cancellationToken">The governing cancellation token.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// Cancellation exceptions propagate when the governing token is requested; otherwise they are mapped. Cancellation is checked before/after work and after incoming awaits.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
     public static async Task<Result<TOut>> TryMapAsync<TIn, TOut>(
         this Result<TIn> result,
         Func<TIn, CancellationToken, Task<TOut>> mapper,
         CancellationToken cancellationToken,
-        string? errorCode = null)
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
     {
+        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(mapper);
-
         using IRailwayTimer timer = RailwayLogging.StartOperation();
-
         Result<TOut> output;
-
         if (result is Result<TIn>.Ok ok)
         {
+            Exception? caught = null;
+            Task<TOut>? returned = default;
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                TOut mapped = await mapper(ok.Value, cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-                output = new Result<TOut>.Ok(mapped);
+                returned = mapper(ok.Value, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
-                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+                caught = ex;
+            }
+            TOut value = default!;
+            if (caught is null)
+            {
+                Task<TOut> work = RailwayContracts.Output(returned);
+                try
+                {
+                    value = await work.ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+                {
+                    caught = ex;
+                }
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                output = new Result<TOut>.Ok(value);
             }
         }
         else
         {
-            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
-            output = new Result<TOut>.Fail(fail.Error);
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
         }
-
         RailwayLogging.Logger?.LogOperation("TryMapAsync", result, output, timer.GetElapsed());
         return output;
     }
 
-    /// <summary>
-    /// Applies an asynchronous binder function to the success value and converts exceptions to failures, except cancellation requested by the governing token.
-    /// </summary>
-    /// <typeparam name="TIn">The input value type.</typeparam>
-    /// <typeparam name="TOut">The output value type.</typeparam>
-    /// <param name="result">The result to bind.</param>
-    /// <param name="binder">The async function that returns a new Result.</param>
-    /// <param name="cancellationToken">The required governing token passed unchanged to the delegate.</param>
-    /// <param name="errorCode">Optional error code passed to Error.FromException for converted exceptions.</param>
-    /// <returns>A task containing the result of the binder, or Fail with the error or a converted exception.</returns>
-    /// <exception cref="ArgumentNullException">A required delegate or operation argument is null.</exception>
-    /// <exception cref="OperationCanceledException">Cancellation is raised while the governing token is requested.</exception>
-    /// <remarks>Argument validation precedes cancellation.
-    /// Direct Result failures skip the delegate without observing cancellation. The token is checked before delegate invocation and after normal awaits.
-    /// Cancellation propagates when the governing token is requested at the catch boundary; otherwise it is converted through Error.FromException.
-    /// Propagated cancellation emits no Railway operation log. Delegates that ignore cancellation are not interrupted.</remarks>
-    public static async Task<Result<TOut>> TryBindAsync<TIn, TOut>(
-        this Result<TIn> result,
-        Func<TIn, CancellationToken, Task<Result<TOut>>> binder,
-        CancellationToken cancellationToken,
-        string? errorCode = null)
+    /// <summary>Runs the supplied map operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="resultTask">The incoming task; its faults propagate without conversion.</param>
+    /// <param name="mapper">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Incoming tasks are awaited normally before callback exception handling.</remarks>
+    public static async Task<Result<TOut>> TryMapAsync<TIn, TOut>(
+        this Task<Result<TIn>> resultTask,
+        Func<TIn, TOut> mapper,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
     {
-        ArgumentNullException.ThrowIfNull(binder);
-
+        ArgumentNullException.ThrowIfNull(resultTask);
+        ArgumentNullException.ThrowIfNull(mapper);
+        Result<TIn> result = RailwayContracts.Output(await resultTask.ConfigureAwait(false));
         using IRailwayTimer timer = RailwayLogging.StartOperation();
-
         Result<TOut> output;
-
         if (result is Result<TIn>.Ok ok)
         {
+            Exception? caught = null;
+            TOut returned = default!;
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                output = await binder(ok.Value, cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
+                returned = mapper(ok.Value);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                output = new Result<TOut>.Fail(Error.FromException(ex, errorCode));
+                caught = ex;
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                output = new Result<TOut>.Ok(returned);
             }
         }
         else
         {
-            Result<TIn>.Fail fail = (Result<TIn>.Fail)result;
-            output = new Result<TOut>.Fail(fail.Error);
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
         }
+        RailwayLogging.Logger?.LogOperation("TryMapAsync", result, output, timer.GetElapsed());
+        return output;
+    }
 
+    /// <summary>Runs the supplied map operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="resultTask">The incoming task; its faults propagate without conversion.</param>
+    /// <param name="mapper">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Incoming tasks are awaited normally before callback exception handling.</remarks>
+    public static async Task<Result<TOut>> TryMapAsync<TIn, TOut>(
+        this Task<Result<TIn>> resultTask,
+        Func<TIn, Task<TOut>> mapper,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(resultTask);
+        ArgumentNullException.ThrowIfNull(mapper);
+        Result<TIn> result = RailwayContracts.Output(await resultTask.ConfigureAwait(false));
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            Exception? caught = null;
+            Task<TOut>? returned = default;
+            try
+            {
+                returned = mapper(ok.Value);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                caught = ex;
+            }
+            TOut value = default!;
+            if (caught is null)
+            {
+                Task<TOut> work = RailwayContracts.Output(returned);
+                try
+                {
+                    value = await work.ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    caught = ex;
+                }
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                output = new Result<TOut>.Ok(value);
+            }
+        }
+        else
+        {
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
+        }
+        RailwayLogging.Logger?.LogOperation("TryMapAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied map operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="resultTask">The incoming task; its faults propagate without conversion.</param>
+    /// <param name="mapper">The callback to invoke on the selected track.</param>
+    /// <param name="cancellationToken">The governing cancellation token.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// Cancellation exceptions propagate when the governing token is requested; otherwise they are mapped. Cancellation is checked before/after work and after incoming awaits.
+    /// Incoming tasks are awaited normally before callback exception handling.</remarks>
+    public static async Task<Result<TOut>> TryMapAsync<TIn, TOut>(
+        this Task<Result<TIn>> resultTask,
+        Func<TIn, CancellationToken, Task<TOut>> mapper,
+        CancellationToken cancellationToken,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(resultTask);
+        ArgumentNullException.ThrowIfNull(mapper);
+        Result<TIn> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            Exception? caught = null;
+            Task<TOut>? returned = default;
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                returned = mapper(ok.Value, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                caught = ex;
+            }
+            TOut value = default!;
+            if (caught is null)
+            {
+                Task<TOut> work = RailwayContracts.Output(returned);
+                try
+                {
+                    value = await work.ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+                {
+                    caught = ex;
+                }
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                output = new Result<TOut>.Ok(value);
+            }
+        }
+        else
+        {
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
+        }
+        RailwayLogging.Logger?.LogOperation("TryMapAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied map operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="resultTask">The incoming task; its faults propagate without conversion.</param>
+    /// <param name="mapper">The callback to invoke on the selected track.</param>
+    /// <param name="cancellationToken">The governing cancellation token.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// Cancellation exceptions propagate when the governing token is requested; otherwise they are mapped. Cancellation is checked before/after work and after incoming awaits.
+    /// Incoming tasks are awaited normally before callback exception handling.</remarks>
+    public static async Task<Result<TOut>> TryMapAsync<TIn, TOut>(
+        this Task<Result<TIn>> resultTask,
+        Func<TIn, CancellationToken, TOut> mapper,
+        CancellationToken cancellationToken,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(resultTask);
+        ArgumentNullException.ThrowIfNull(mapper);
+        Result<TIn> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            Exception? caught = null;
+            TOut returned = default!;
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                returned = mapper(ok.Value, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                caught = ex;
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                output = new Result<TOut>.Ok(returned);
+            }
+        }
+        else
+        {
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
+        }
+        RailwayLogging.Logger?.LogOperation("TryMapAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied bind operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="result">The incoming result.</param>
+    /// <param name="binder">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
+    public static Result<TOut> TryBind<TIn, TOut>(
+        this Result<TIn> result,
+        Func<TIn, Result<TOut>> binder,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(binder);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            Exception? caught = null;
+            Result<TOut>? returned = default;
+            try
+            {
+                returned = binder(ok.Value);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                caught = ex;
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                output = RailwayContracts.Output(returned);
+            }
+        }
+        else
+        {
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
+        }
+        RailwayLogging.Logger?.LogOperation("TryBind", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied bind operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="result">The incoming result.</param>
+    /// <param name="binder">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
+    public static async Task<Result<TOut>> TryBindAsync<TIn, TOut>(
+        this Result<TIn> result,
+        Func<TIn, Task<Result<TOut>>> binder,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(binder);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            Exception? caught = null;
+            Task<Result<TOut>>? returned = default;
+            try
+            {
+                returned = binder(ok.Value);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                caught = ex;
+            }
+            Result<TOut>? value = default;
+            if (caught is null)
+            {
+                Task<Result<TOut>> work = RailwayContracts.Output(returned);
+                try
+                {
+                    value = await work.ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    caught = ex;
+                }
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                output = RailwayContracts.Output(value);
+            }
+        }
+        else
+        {
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
+        }
         RailwayLogging.Logger?.LogOperation("TryBindAsync", result, output, timer.GetElapsed());
         return output;
     }
+
+    /// <summary>Runs the supplied bind operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="result">The incoming result.</param>
+    /// <param name="binder">The callback to invoke on the selected track.</param>
+    /// <param name="cancellationToken">The governing cancellation token.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// Cancellation exceptions propagate when the governing token is requested; otherwise they are mapped. Cancellation is checked before/after work and after incoming awaits.
+    /// Only callback invocation and its asynchronous completion are converted.</remarks>
+    public static async Task<Result<TOut>> TryBindAsync<TIn, TOut>(
+        this Result<TIn> result,
+        Func<TIn, CancellationToken, Task<Result<TOut>>> binder,
+        CancellationToken cancellationToken,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(binder);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            Exception? caught = null;
+            Task<Result<TOut>>? returned = default;
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                returned = binder(ok.Value, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                caught = ex;
+            }
+            Result<TOut>? value = default;
+            if (caught is null)
+            {
+                Task<Result<TOut>> work = RailwayContracts.Output(returned);
+                try
+                {
+                    value = await work.ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+                {
+                    caught = ex;
+                }
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                output = RailwayContracts.Output(value);
+            }
+        }
+        else
+        {
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
+        }
+        RailwayLogging.Logger?.LogOperation("TryBindAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied bind operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="resultTask">The incoming task; its faults propagate without conversion.</param>
+    /// <param name="binder">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Incoming tasks are awaited normally before callback exception handling.</remarks>
+    public static async Task<Result<TOut>> TryBindAsync<TIn, TOut>(
+        this Task<Result<TIn>> resultTask,
+        Func<TIn, Result<TOut>> binder,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(resultTask);
+        ArgumentNullException.ThrowIfNull(binder);
+        Result<TIn> result = RailwayContracts.Output(await resultTask.ConfigureAwait(false));
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            Exception? caught = null;
+            Result<TOut>? returned = default;
+            try
+            {
+                returned = binder(ok.Value);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                caught = ex;
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                output = RailwayContracts.Output(returned);
+            }
+        }
+        else
+        {
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
+        }
+        RailwayLogging.Logger?.LogOperation("TryBindAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied bind operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="resultTask">The incoming task; its faults propagate without conversion.</param>
+    /// <param name="binder">The callback to invoke on the selected track.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// OperationCanceledException propagates without mapping.
+    /// Incoming tasks are awaited normally before callback exception handling.</remarks>
+    public static async Task<Result<TOut>> TryBindAsync<TIn, TOut>(
+        this Task<Result<TIn>> resultTask,
+        Func<TIn, Task<Result<TOut>>> binder,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(resultTask);
+        ArgumentNullException.ThrowIfNull(binder);
+        Result<TIn> result = RailwayContracts.Output(await resultTask.ConfigureAwait(false));
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            Exception? caught = null;
+            Task<Result<TOut>>? returned = default;
+            try
+            {
+                returned = binder(ok.Value);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                caught = ex;
+            }
+            Result<TOut>? value = default;
+            if (caught is null)
+            {
+                Task<Result<TOut>> work = RailwayContracts.Output(returned);
+                try
+                {
+                    value = await work.ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    caught = ex;
+                }
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                output = RailwayContracts.Output(value);
+            }
+        }
+        else
+        {
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
+        }
+        RailwayLogging.Logger?.LogOperation("TryBindAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied bind operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="resultTask">The incoming task; its faults propagate without conversion.</param>
+    /// <param name="binder">The callback to invoke on the selected track.</param>
+    /// <param name="cancellationToken">The governing cancellation token.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// Cancellation exceptions propagate when the governing token is requested; otherwise they are mapped. Cancellation is checked before/after work and after incoming awaits.
+    /// Incoming tasks are awaited normally before callback exception handling.</remarks>
+    public static async Task<Result<TOut>> TryBindAsync<TIn, TOut>(
+        this Task<Result<TIn>> resultTask,
+        Func<TIn, CancellationToken, Task<Result<TOut>>> binder,
+        CancellationToken cancellationToken,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(resultTask);
+        ArgumentNullException.ThrowIfNull(binder);
+        Result<TIn> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            Exception? caught = null;
+            Task<Result<TOut>>? returned = default;
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                returned = binder(ok.Value, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                caught = ex;
+            }
+            Result<TOut>? value = default;
+            if (caught is null)
+            {
+                Task<Result<TOut>> work = RailwayContracts.Output(returned);
+                try
+                {
+                    value = await work.ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+                {
+                    caught = ex;
+                }
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                output = RailwayContracts.Output(value);
+            }
+        }
+        else
+        {
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
+        }
+        RailwayLogging.Logger?.LogOperation("TryBindAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
+    /// <summary>Runs the supplied bind operation, converting eligible callback exceptions to errors.</summary>
+    /// <typeparam name="TIn">The TIn value type.</typeparam>
+    /// <typeparam name="TOut">The TOut value type.</typeparam>
+    /// <param name="resultTask">The incoming task; its faults propagate without conversion.</param>
+    /// <param name="binder">The callback to invoke on the selected track.</param>
+    /// <param name="cancellationToken">The governing cancellation token.</param>
+    /// <param name="errorCode">Default conversion code; ignored when a custom mapper is supplied.</param>
+    /// <param name="exceptionMapper">Optional synchronous mapper; owns the complete Error and exception retention. Null selects default conversion.</param>
+    /// <returns>The operation result, or a converted exception.</returns>
+    /// <remarks>Required arguments are validated before work. Mapper exceptions and null structure outputs propagate.
+    /// Cancellation exceptions propagate when the governing token is requested; otherwise they are mapped. Cancellation is checked before/after work and after incoming awaits.
+    /// Incoming tasks are awaited normally before callback exception handling.</remarks>
+    public static async Task<Result<TOut>> TryBindAsync<TIn, TOut>(
+        this Task<Result<TIn>> resultTask,
+        Func<TIn, CancellationToken, Result<TOut>> binder,
+        CancellationToken cancellationToken,
+        string? errorCode = null,
+        Func<Exception, Error>? exceptionMapper = null)
+    {
+        ArgumentNullException.ThrowIfNull(resultTask);
+        ArgumentNullException.ThrowIfNull(binder);
+        Result<TIn> result = await resultTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        result = RailwayContracts.Output(result);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TOut> output;
+        if (result is Result<TIn>.Ok ok)
+        {
+            Exception? caught = null;
+            Result<TOut>? returned = default;
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                returned = binder(ok.Value, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                caught = ex;
+            }
+            if (caught is not null)
+            {
+                Error error = exceptionMapper is null ? Error.FromException(caught, errorCode) : RailwayContracts.Output(exceptionMapper(caught));
+                output = new Result<TOut>.Fail(error);
+            }
+            else
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                output = RailwayContracts.Output(returned);
+            }
+        }
+        else
+        {
+            output = new Result<TOut>.Fail(((Result<TIn>.Fail)result).Error);
+        }
+        RailwayLogging.Logger?.LogOperation("TryBindAsync", result, output, timer.GetElapsed());
+        return output;
+    }
+
 }

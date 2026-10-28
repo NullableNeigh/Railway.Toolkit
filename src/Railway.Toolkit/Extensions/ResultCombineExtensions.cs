@@ -19,7 +19,20 @@ public static class ResultCombineExtensions
         this Result<T1> first,
         Result<T2> second)
     {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
         using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<(T1, T2)> output = ZipCore(first, second);
+        RailwayLogging.Logger?.LogOperation("Zip", first, output, timer.GetElapsed());
+        return output;
+    }
+
+    private static Result<(T1, T2)> ZipCore<T1, T2>(
+        this Result<T1> first,
+        Result<T2> second)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
 
         Result<(T1, T2)> output;
 
@@ -41,7 +54,6 @@ public static class ResultCombineExtensions
             output = new Result<(T1, T2)>.Fail(fail1.Error);
         }
 
-        RailwayLogging.Logger?.LogOperation("Zip", first, output, timer.GetElapsed());
         return output;
     }
 
@@ -61,9 +73,28 @@ public static class ResultCombineExtensions
         Result<T2> second,
         Func<T1, T2, TResult> selector)
     {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+        ArgumentNullException.ThrowIfNull(selector);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TResult> output = ZipCore(first, second, selector);
+        RailwayLogging.Logger?.LogOperation("Zip", first, output, timer.GetElapsed());
+        return output;
+    }
+
+    private static Result<TResult> ZipCore<T1, T2, TResult>(
+        this Result<T1> first,
+        Result<T2> second,
+        Func<T1, T2, TResult> selector)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
         ArgumentNullException.ThrowIfNull(selector);
 
-        return first.Zip(second).Map(tuple => selector(tuple.Item1, tuple.Item2));
+        Result<(T1, T2)> zipped = first.ZipCore(second);
+        return zipped is Result<(T1, T2)>.Ok ok
+            ? new Result<TResult>.Ok(selector(ok.Value.Item1, ok.Value.Item2))
+            : new Result<TResult>.Fail(((Result<(T1, T2)>.Fail)zipped).Error);
     }
 
     /// <summary>
@@ -75,7 +106,25 @@ public static class ResultCombineExtensions
         Result<T2> second,
         Result<T3> third)
     {
-        Result<(T1, T2)> zipped = first.Zip(second);
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+        ArgumentNullException.ThrowIfNull(third);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<(T1, T2, T3)> output = ZipCore(first, second, third);
+        RailwayLogging.Logger?.LogOperation("Zip", first, output, timer.GetElapsed());
+        return output;
+    }
+
+    private static Result<(T1, T2, T3)> ZipCore<T1, T2, T3>(
+        this Result<T1> first,
+        Result<T2> second,
+        Result<T3> third)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+        ArgumentNullException.ThrowIfNull(third);
+
+        Result<(T1, T2)> zipped = first.ZipCore(second);
 
         if (zipped is Result<(T1, T2)>.Ok ok12)
         {
@@ -101,9 +150,31 @@ public static class ResultCombineExtensions
         Result<T3> third,
         Func<T1, T2, T3, TResult> selector)
     {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+        ArgumentNullException.ThrowIfNull(third);
+        ArgumentNullException.ThrowIfNull(selector);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TResult> output = ZipCore(first, second, third, selector);
+        RailwayLogging.Logger?.LogOperation("Zip", first, output, timer.GetElapsed());
+        return output;
+    }
+
+    private static Result<TResult> ZipCore<T1, T2, T3, TResult>(
+        this Result<T1> first,
+        Result<T2> second,
+        Result<T3> third,
+        Func<T1, T2, T3, TResult> selector)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+        ArgumentNullException.ThrowIfNull(third);
         ArgumentNullException.ThrowIfNull(selector);
 
-        return first.Zip(second, third).Map(tuple => selector(tuple.Item1, tuple.Item2, tuple.Item3));
+        Result<(T1, T2, T3)> zipped = first.ZipCore(second, third);
+        return zipped is Result<(T1, T2, T3)>.Ok ok
+            ? new Result<TResult>.Ok(selector(ok.Value.Item1, ok.Value.Item2, ok.Value.Item3))
+            : new Result<TResult>.Fail(((Result<(T1, T2, T3)>.Fail)zipped).Error);
     }
 
     /// <summary>
@@ -113,9 +184,17 @@ public static class ResultCombineExtensions
         this Task<Result<T1>> firstTask,
         Task<Result<T2>> secondTask)
     {
+        ArgumentNullException.ThrowIfNull(firstTask);
+        ArgumentNullException.ThrowIfNull(secondTask);
+
         Result<T1> first = await firstTask.ConfigureAwait(false);
+        first = RailwayContracts.Output(first);
         Result<T2> second = await secondTask.ConfigureAwait(false);
-        return first.Zip(second);
+        second = RailwayContracts.Output(second);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<(T1, T2)> output = first.ZipCore(second);
+        RailwayLogging.Logger?.LogOperation("ZipAsync", first, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -126,11 +205,18 @@ public static class ResultCombineExtensions
         Task<Result<T2>> secondTask,
         Func<T1, T2, TResult> selector)
     {
+        ArgumentNullException.ThrowIfNull(firstTask);
+        ArgumentNullException.ThrowIfNull(secondTask);
         ArgumentNullException.ThrowIfNull(selector);
 
         Result<T1> first = await firstTask.ConfigureAwait(false);
+        first = RailwayContracts.Output(first);
         Result<T2> second = await secondTask.ConfigureAwait(false);
-        return first.Zip(second, selector);
+        second = RailwayContracts.Output(second);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<TResult> output = first.ZipCore(second, selector);
+        RailwayLogging.Logger?.LogOperation("ZipAsync", first, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>
@@ -152,6 +238,7 @@ public static class ResultCombineExtensions
 
         foreach (Result<T> result in results)
         {
+            ArgumentNullException.ThrowIfNull(result);
             if (result is Result<T>.Ok ok)
             {
                 values.Add(ok.Value);
@@ -177,6 +264,12 @@ public static class ResultCombineExtensions
     public static Result<IReadOnlyList<T>> Combine<T>(this IEnumerable<Result<T>> results)
     {
         ArgumentNullException.ThrowIfNull(results);
+        return CombineCore(results, "Combine");
+    }
+
+    private static Result<IReadOnlyList<T>> CombineCore<T>(this IEnumerable<Result<T>> results, string operation)
+    {
+        ArgumentNullException.ThrowIfNull(results);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
 
@@ -185,6 +278,7 @@ public static class ResultCombineExtensions
 
         foreach (Result<T> result in results)
         {
+            ArgumentNullException.ThrowIfNull(result);
             if (result is Result<T>.Ok ok)
             {
                 values.Add(ok.Value);
@@ -193,13 +287,13 @@ public static class ResultCombineExtensions
             {
                 Result<T>.Fail fail = (Result<T>.Fail)result;
                 Result<IReadOnlyList<T>> failOutput = new Result<IReadOnlyList<T>>.Fail(fail.Error);
-                RailwayLogging.Logger?.LogOperation("Combine", input, failOutput, timer.GetElapsed());
+                RailwayLogging.Logger?.LogOperation(operation, input, failOutput, timer.GetElapsed());
                 return failOutput;
             }
         }
 
         Result<IReadOnlyList<T>> output = new Result<IReadOnlyList<T>>.Ok(values);
-        RailwayLogging.Logger?.LogOperation("Combine", input, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation(operation, input, output, timer.GetElapsed());
         return output;
     }
 
@@ -224,6 +318,12 @@ public static class ResultCombineExtensions
     public static Result<IReadOnlyList<T>> CombineAll<T>(this IEnumerable<Result<T>> results)
     {
         ArgumentNullException.ThrowIfNull(results);
+        return CombineAllCore(results, "CombineAll");
+    }
+
+    private static Result<IReadOnlyList<T>> CombineAllCore<T>(this IEnumerable<Result<T>> results, string operation)
+    {
+        ArgumentNullException.ThrowIfNull(results);
 
         using IRailwayTimer timer = RailwayLogging.StartOperation();
 
@@ -233,6 +333,7 @@ public static class ResultCombineExtensions
 
         foreach (Result<T> result in results)
         {
+            ArgumentNullException.ThrowIfNull(result);
             if (result is Result<T>.Ok ok)
             {
                 values.Add(ok.Value);
@@ -248,7 +349,7 @@ public static class ResultCombineExtensions
             ? new Result<IReadOnlyList<T>>.Fail(Error.Aggregate(errors))
             : new Result<IReadOnlyList<T>>.Ok(values);
 
-        RailwayLogging.Logger?.LogOperation("CombineAll", input, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation(operation, input, output, timer.GetElapsed());
         return output;
     }
 
@@ -259,9 +360,17 @@ public static class ResultCombineExtensions
     public static async Task<Result<IReadOnlyList<T>>> CombineAsync<T>(params Task<Result<T>>[] resultTasks)
     {
         ArgumentNullException.ThrowIfNull(resultTasks);
+        foreach (Task<Result<T>> task in resultTasks)
+        {
+            ArgumentNullException.ThrowIfNull(task, nameof(resultTasks));
+        }
 
         Result<T>[] results = await Task.WhenAll(resultTasks).ConfigureAwait(false);
-        return Combine(results);
+        foreach (Result<T> result in results)
+        {
+            RailwayContracts.Output(result);
+        }
+        return CombineCore(results, "CombineAsync");
     }
 
     /// <summary>
@@ -270,9 +379,17 @@ public static class ResultCombineExtensions
     public static async Task<Result<IReadOnlyList<T>>> CombineAllAsync<T>(params Task<Result<T>>[] resultTasks)
     {
         ArgumentNullException.ThrowIfNull(resultTasks);
+        foreach (Task<Result<T>> task in resultTasks)
+        {
+            ArgumentNullException.ThrowIfNull(task, nameof(resultTasks));
+        }
 
         Result<T>[] results = await Task.WhenAll(resultTasks).ConfigureAwait(false);
-        return CombineAll(results);
+        foreach (Result<T> result in results)
+        {
+            RailwayContracts.Output(result);
+        }
+        return CombineAllCore(results, "CombineAllAsync");
     }
 
     /// <summary>Awaits all supplied tasks, then combines their results with cancellation precedence.</summary>
@@ -289,16 +406,17 @@ public static class ResultCombineExtensions
         ArgumentNullException.ThrowIfNull(resultTasks);
         foreach (Task<Result<T>> task in resultTasks)
         {
-            if (task is null)
-            {
-                throw new ArgumentException("The task collection contains a null task.", nameof(resultTasks));
-            }
+            ArgumentNullException.ThrowIfNull(task, nameof(resultTasks));
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         Result<T>[] results = await Task.WhenAll(resultTasks).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        return Combine(results);
+        foreach (Result<T> result in results)
+        {
+            RailwayContracts.Output(result);
+        }
+        return CombineCore(results, "CombineAsync");
     }
 
     /// <summary>Awaits all supplied tasks, then combines their results with cancellation precedence.</summary>
@@ -315,16 +433,17 @@ public static class ResultCombineExtensions
         ArgumentNullException.ThrowIfNull(resultTasks);
         foreach (Task<Result<T>> task in resultTasks)
         {
-            if (task is null)
-            {
-                throw new ArgumentException("The task collection contains a null task.", nameof(resultTasks));
-            }
+            ArgumentNullException.ThrowIfNull(task, nameof(resultTasks));
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         Result<T>[] results = await Task.WhenAll(resultTasks).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        return CombineAll(results);
+        foreach (Result<T> result in results)
+        {
+            RailwayContracts.Output(result);
+        }
+        return CombineAllCore(results, "CombineAllAsync");
     }
 
     /// <summary>Combines two supplied result tasks into a tuple with cancellation precedence.</summary>
@@ -345,9 +464,14 @@ public static class ResultCombineExtensions
 
         Result<T1> first = await firstTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        first = RailwayContracts.Output(first);
         Result<T2> second = await secondTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        return first.Zip(second);
+        second = RailwayContracts.Output(second);
+        using IRailwayTimer timer = RailwayLogging.StartOperation();
+        Result<(T1, T2)> output = first.ZipCore(second);
+        RailwayLogging.Logger?.LogOperation("ZipAsync", first, output, timer.GetElapsed());
+        return output;
     }
 
     /// <summary>Combines two supplied result tasks using a synchronous token-aware selector.</summary>
@@ -371,19 +495,21 @@ public static class ResultCombineExtensions
 
         Result<T1> first = await firstTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        first = RailwayContracts.Output(first);
         Result<T2> second = await secondTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        second = RailwayContracts.Output(second);
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         if (first is Result<T1>.Fail firstFail)
         {
             Result<TResult> failure = new Result<TResult>.Fail(firstFail.Error);
-            RailwayLogging.Logger?.LogOperation("Zip", first, failure, timer.GetElapsed());
+            RailwayLogging.Logger?.LogOperation("ZipAsync", first, failure, timer.GetElapsed());
             return failure;
         }
         if (second is Result<T2>.Fail secondFail)
         {
             Result<TResult> failure = new Result<TResult>.Fail(secondFail.Error);
-            RailwayLogging.Logger?.LogOperation("Zip", first, failure, timer.GetElapsed());
+            RailwayLogging.Logger?.LogOperation("ZipAsync", first, failure, timer.GetElapsed());
             return failure;
         }
 
@@ -391,7 +517,7 @@ public static class ResultCombineExtensions
         TResult value = selector(((Result<T1>.Ok)first).Value, ((Result<T2>.Ok)second).Value, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         Result<TResult> output = new Result<TResult>.Ok(value);
-        RailwayLogging.Logger?.LogOperation("Zip", first, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("ZipAsync", first, output, timer.GetElapsed());
         return output;
     }
 }

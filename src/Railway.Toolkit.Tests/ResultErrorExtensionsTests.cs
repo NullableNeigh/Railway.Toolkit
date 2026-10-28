@@ -81,45 +81,9 @@ public class ResultErrorExtensionsTests
         Assert.Equal(999, recovered.Match(ok => ok.Value, fail => 0));
     }
 
-    [Fact]
-    public void Recover_ShouldBeAliasForOrElse()
-    {
-        Result<int> result = Result.Fail<int>("Error", "TEST");
 
-        Result<int> recovered = result.Recover(999);
 
-        Assert.Equal(999, recovered.Match(ok => ok.Value, fail => 0));
-    }
 
-    [Fact]
-    public void RecoverWith_ShouldBeAliasForOrElseWith()
-    {
-        Result<int> result = Result.Fail<int>("Error", "TEST");
-
-        Result<int> recovered = result.RecoverWith(Result.Ok(999));
-
-        Assert.Equal(999, recovered.Match(ok => ok.Value, fail => 0));
-    }
-
-    [Fact]
-    public void Recover_WithFactory_ShouldWorkLikeOrElse()
-    {
-        Result<int> result = Result.Fail<int>("Error", "TEST");
-
-        Result<int> recovered = result.Recover(error => 999);
-
-        Assert.Equal(999, recovered.Match(ok => ok.Value, fail => 0));
-    }
-
-    [Fact]
-    public void RecoverWith_WithFactory_ShouldWorkLikeOrElseWith()
-    {
-        Result<int> result = Result.Fail<int>("Error", "TEST");
-
-        Result<int> recovered = result.RecoverWith(error => Result.Ok(999));
-
-        Assert.Equal(999, recovered.Match(ok => ok.Value, fail => 0));
-    }
 
     [Fact]
     public void MapError_InPipeline_CanAddContext()
@@ -135,11 +99,11 @@ public class ResultErrorExtensionsTests
     }
 
     [Fact]
-    public void Recover_InPipeline_CanProvideDefaultBehavior()
+    public void OrElse_InPipeline_CanProvideDefaultBehavior()
     {
         Result<int> result = Railway.Start(5)
             .Bind(x => Result.Fail<int>("Not found", "NOT_FOUND"))
-            .Recover(error => error.Code == "NOT_FOUND" ? 0 : -1)
+            .OrElse(error => error.Code == "NOT_FOUND" ? 0 : -1)
             .Map(x => x * 2);
 
         Assert.Equal(0, result.Match(ok => ok.Value, fail => -999));

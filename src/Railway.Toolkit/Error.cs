@@ -42,6 +42,8 @@ namespace Railway.Toolkit
         /// </summary>
         public static Error FromException(Exception exception, string? code = null)
         {
+            ArgumentNullException.ThrowIfNull(exception);
+
             return new Error
             {
                 Message = exception.Message,
@@ -55,6 +57,9 @@ namespace Railway.Toolkit
         /// </summary>
         public static Error Create(string message, string code)
         {
+            ArgumentNullException.ThrowIfNull(message);
+            ArgumentNullException.ThrowIfNull(code);
+
             return new Error
             {
                 Message = message,
@@ -70,7 +75,13 @@ namespace Railway.Toolkit
         /// <returns>An aggregate error containing all the individual errors.</returns>
         public static Error Aggregate(IEnumerable<Error> errors, string code = "AggregateError")
         {
+            ArgumentNullException.ThrowIfNull(errors);
+
             List<Error> errorList = errors.ToList();
+            foreach (Error error in errorList)
+            {
+                ArgumentNullException.ThrowIfNull(error, nameof(errors));
+            }
 
             if (errorList.Count == 0)
             {
@@ -102,7 +113,15 @@ namespace Railway.Toolkit
         /// <returns>An aggregate error containing all the individual errors.</returns>
         public static Error Aggregate(IEnumerable<Error> errors, string message, string code)
         {
+            ArgumentNullException.ThrowIfNull(errors);
+            ArgumentNullException.ThrowIfNull(message);
+            ArgumentNullException.ThrowIfNull(code);
+
             List<Error> errorList = errors.ToList();
+            foreach (Error error in errorList)
+            {
+                ArgumentNullException.ThrowIfNull(error, nameof(errors));
+            }
 
             if (errorList.Count == 0)
             {
