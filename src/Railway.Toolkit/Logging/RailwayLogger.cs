@@ -36,7 +36,8 @@ internal sealed class RailwayLogger : IRailwayLogger
         string operation,
         Result<TIn> input,
         Result<TOut> output,
-        TimeSpan elapsed)
+        TimeSpan elapsed,
+        bool? executed = null)
     {
         if (!_options.Enabled)
         {
@@ -75,9 +76,9 @@ internal sealed class RailwayLogger : IRailwayLogger
 
         using IDisposable? scope = _logger.BeginScope(scopeData);
 
-        if (!inputWasOk)
+        if (!(executed ?? inputWasOk))
         {
-            // Already on failure track — operation was skipped
+            // The operation's selected track was not reached.
             _logger.Log(logLevel, "{Emoji} \"{Operation}\" skipped, {Duration}",
                 emoji, operation, FormatDuration(elapsed));
         }
@@ -85,6 +86,11 @@ internal sealed class RailwayLogger : IRailwayLogger
         {
             // Success track — operation executed and stayed on success track
             _logger.Log(logLevel, "{Emoji} \"{Operation}\" executed ✓, {Duration}",
+                emoji, operation, FormatDuration(elapsed));
+        }
+        else if (!inputWasOk)
+        {
+            _logger.Log(logLevel, "{Emoji} \"{Operation}\" executed on failure track, {Duration}",
                 emoji, operation, FormatDuration(elapsed));
         }
         else

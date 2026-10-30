@@ -36,7 +36,7 @@ public static class ResultErrorExtensions
             output = new Result<T>.Fail(RailwayContracts.Output(mapper(fail.Error)));
         }
 
-        RailwayLogging.Logger?.LogOperation("MapError", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("MapError", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -70,7 +70,7 @@ public static class ResultErrorExtensions
             output = new Result<T>.Fail(RailwayContracts.Output(mapper(fail.Error)));
         }
 
-        RailwayLogging.Logger?.LogOperation("MapErrorAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("MapErrorAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -102,7 +102,7 @@ public static class ResultErrorExtensions
             output = new Result<T>.Fail(RailwayContracts.Output(await RailwayContracts.Output(mapper(fail.Error)).ConfigureAwait(false)));
         }
 
-        RailwayLogging.Logger?.LogOperation("MapErrorAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("MapErrorAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -145,7 +145,7 @@ public static class ResultErrorExtensions
             ? new Result<T>.Ok(ok.Value)
             : new Result<T>.Ok(defaultValue);
 
-        RailwayLogging.Logger?.LogOperation("OrElse", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElse", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -177,7 +177,7 @@ public static class ResultErrorExtensions
             output = new Result<T>.Ok(defaultValueFactory(fail.Error));
         }
 
-        RailwayLogging.Logger?.LogOperation("OrElse", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElse", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -202,7 +202,7 @@ public static class ResultErrorExtensions
             ? new Result<T>.Ok(ok.Value)
             : alternative;
 
-        RailwayLogging.Logger?.LogOperation("OrElseWith", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseWith", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -234,7 +234,7 @@ public static class ResultErrorExtensions
             output = RailwayContracts.Output(alternativeFactory(fail.Error));
         }
 
-        RailwayLogging.Logger?.LogOperation("OrElseWith", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseWith", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -268,7 +268,7 @@ public static class ResultErrorExtensions
             output = new Result<T>.Fail(error);
         }
 
-        RailwayLogging.Logger?.LogOperation("MapErrorAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("MapErrorAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -329,7 +329,7 @@ public static class ResultErrorExtensions
             output = new Result<T>.Fail(error);
         }
 
-        RailwayLogging.Logger?.LogOperation("MapErrorAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("MapErrorAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -354,7 +354,7 @@ public static class ResultErrorExtensions
             T fallback = defaultValue;
             output = new Result<T>.Ok(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -380,7 +380,7 @@ public static class ResultErrorExtensions
             T fallback = defaultValueFactory(fail.Error);
             output = new Result<T>.Ok(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -405,7 +405,7 @@ public static class ResultErrorExtensions
             T fallback = await RailwayContracts.Output(defaultValueFactory(fail.Error)).ConfigureAwait(false);
             output = new Result<T>.Ok(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -434,7 +434,7 @@ public static class ResultErrorExtensions
             cancellationToken.ThrowIfCancellationRequested();
             output = new Result<T>.Ok(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -466,7 +466,7 @@ public static class ResultErrorExtensions
             cancellationToken.ThrowIfCancellationRequested();
             output = new Result<T>.Ok(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -498,7 +498,7 @@ public static class ResultErrorExtensions
             cancellationToken.ThrowIfCancellationRequested();
             output = new Result<T>.Ok(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -524,7 +524,7 @@ public static class ResultErrorExtensions
             Result<T> fallback = alternative;
             output = RailwayContracts.Output(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -550,7 +550,7 @@ public static class ResultErrorExtensions
             Result<T> fallback = alternativeFactory(fail.Error);
             output = RailwayContracts.Output(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -576,7 +576,7 @@ public static class ResultErrorExtensions
 
             output = RailwayContracts.Output(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -606,7 +606,7 @@ public static class ResultErrorExtensions
 
             output = RailwayContracts.Output(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -639,7 +639,7 @@ public static class ResultErrorExtensions
 
             output = RailwayContracts.Output(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -671,7 +671,7 @@ public static class ResultErrorExtensions
             cancellationToken.ThrowIfCancellationRequested();
             output = RailwayContracts.Output(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -691,7 +691,7 @@ public static class ResultErrorExtensions
             T fallback = await RailwayContracts.Output(defaultValueFactory(fail.Error)).ConfigureAwait(false);
             output = new Result<T>.Ok(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -712,7 +712,7 @@ public static class ResultErrorExtensions
 
             output = RailwayContracts.Output(fallback);
         }
-        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("OrElseWithAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 

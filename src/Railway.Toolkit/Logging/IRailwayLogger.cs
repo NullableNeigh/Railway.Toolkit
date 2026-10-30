@@ -21,9 +21,11 @@ internal interface IRailwayLogger
     /// <param name="input">The result passed into the operation.</param>
     /// <param name="output">The result produced by the operation.</param>
     /// <param name="elapsed">How long the operation took.</param>
+    /// <param name="executed">Whether work ran; null uses the success-track input convention.</param>
     void LogOperation<TIn, TOut>(
         string operation,
         Result<TIn> input,
         Result<TOut> output,
-        TimeSpan elapsed);
+        TimeSpan elapsed,
+        bool? executed = null);
 }

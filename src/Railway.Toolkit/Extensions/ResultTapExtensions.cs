@@ -83,7 +83,7 @@ public static class ResultTapExtensions
             action(fail.Error);
         }
 
-        RailwayLogging.Logger?.LogOperation("TapError", result, result, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("TapError", result, result, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return result;
     }
 
@@ -110,7 +110,7 @@ public static class ResultTapExtensions
             action();
         }
 
-        RailwayLogging.Logger?.LogOperation("TapError", result, result, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("TapError", result, result, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return result;
     }
 
@@ -208,7 +208,7 @@ public static class ResultTapExtensions
             action(fail.Error);
         }
 
-        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, result, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, result, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return result;
     }
 
@@ -233,7 +233,7 @@ public static class ResultTapExtensions
             await RailwayContracts.Output(action(fail.Error)).ConfigureAwait(false);
         }
 
-        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, result, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, result, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return result;
     }
 
@@ -276,7 +276,7 @@ public static class ResultTapExtensions
 
         action();
 
-        RailwayLogging.Logger?.LogOperation("Finally", result, result, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("Finally", result, result, timer.GetElapsed(), executed: true);
         return result;
     }
 
@@ -300,7 +300,7 @@ public static class ResultTapExtensions
 
         action(result);
 
-        RailwayLogging.Logger?.LogOperation("Finally", result, result, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("Finally", result, result, timer.GetElapsed(), executed: true);
         return result;
     }
 
@@ -322,7 +322,7 @@ public static class ResultTapExtensions
 
         await RailwayContracts.Output(action()).ConfigureAwait(false);
 
-        RailwayLogging.Logger?.LogOperation("FinallyAsync", result, result, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("FinallyAsync", result, result, timer.GetElapsed(), executed: true);
         return result;
     }
 
@@ -355,7 +355,7 @@ public static class ResultTapExtensions
             using IRailwayTimer timer = RailwayLogging.StartOperation();
             action();
             if (completed)
-                RailwayLogging.Logger?.LogOperation("FinallyAsync", result!, result!, timer.GetElapsed());
+                RailwayLogging.Logger?.LogOperation("FinallyAsync", result!, result!, timer.GetElapsed(), executed: true);
         }
         return result!;
     }
@@ -389,7 +389,7 @@ public static class ResultTapExtensions
             using IRailwayTimer timer = RailwayLogging.StartOperation();
             await RailwayContracts.Output(action()).ConfigureAwait(false);
             if (completed)
-                RailwayLogging.Logger?.LogOperation("FinallyAsync", result!, result!, timer.GetElapsed());
+                RailwayLogging.Logger?.LogOperation("FinallyAsync", result!, result!, timer.GetElapsed(), executed: true);
         }
         return result!;
     }
@@ -485,7 +485,7 @@ public static class ResultTapExtensions
             cancellationToken.ThrowIfCancellationRequested();
         }
 
-        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 
@@ -578,7 +578,7 @@ public static class ResultTapExtensions
             cancellationToken.ThrowIfCancellationRequested();
         }
 
-        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, output, timer.GetElapsed());
+        RailwayLogging.Logger?.LogOperation("TapErrorAsync", result, output, timer.GetElapsed(), executed: result is Result<T>.Fail);
         return output;
     }
 }
