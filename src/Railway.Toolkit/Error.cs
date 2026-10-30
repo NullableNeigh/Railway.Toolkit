@@ -163,6 +163,7 @@ namespace Railway.Toolkit
             return builder.HasDetails ? builder.Build() : null;
         }
 
+        /// <summary>Returns the error code and message in the form "[Code] Message".</summary>
         public override string ToString() => $"[{Code}] {Message}";
     }
 }
