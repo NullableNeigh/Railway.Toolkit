@@ -275,6 +275,7 @@ public static class ResultCombineExtensions
 
         Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<T> values = new List<T>();
+        Error? firstError = null;
 
         foreach (Result<T> result in results)
         {
@@ -286,13 +287,14 @@ public static class ResultCombineExtensions
             else
             {
                 Result<T>.Fail fail = (Result<T>.Fail)result;
-                Result<IReadOnlyList<T>> failOutput = new Result<IReadOnlyList<T>>.Fail(fail.Error);
-                RailwayLogging.Logger?.LogOperation(operation, input, failOutput, timer.GetElapsed());
-                return failOutput;
+                firstError = fail.Error;
+                break;
             }
         }
 
-        Result<IReadOnlyList<T>> output = new Result<IReadOnlyList<T>>.Ok(values);
+        Result<IReadOnlyList<T>> output = firstError is not null
+            ? new Result<IReadOnlyList<T>>.Fail(firstError)
+            : new Result<IReadOnlyList<T>>.Ok(values);
         RailwayLogging.Logger?.LogOperation(operation, input, output, timer.GetElapsed());
         return output;
     }

@@ -26,6 +26,7 @@ public static class ResultCollectionExtensions
 
         Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<TOut> results = new List<TOut>();
+        Error? firstError = null;
 
         foreach (TIn? item in source)
         {
@@ -39,13 +40,14 @@ public static class ResultCollectionExtensions
             else
             {
                 Result<TOut>.Fail fail = (Result<TOut>.Fail)result;
-                Result<IReadOnlyList<TOut>> failOutput = new Result<IReadOnlyList<TOut>>.Fail(fail.Error);
-                RailwayLogging.Logger?.LogOperation("Traverse", input, failOutput, timer.GetElapsed());
-                return failOutput;
+                firstError = fail.Error;
+                break;
             }
         }
 
-        Result<IReadOnlyList<TOut>> output = new Result<IReadOnlyList<TOut>>.Ok(results);
+        Result<IReadOnlyList<TOut>> output = firstError is not null
+            ? new Result<IReadOnlyList<TOut>>.Fail(firstError)
+            : new Result<IReadOnlyList<TOut>>.Ok(results);
         RailwayLogging.Logger?.LogOperation("Traverse", input, output, timer.GetElapsed());
         return output;
     }
@@ -116,6 +118,7 @@ public static class ResultCollectionExtensions
 
         Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<TOut> results = new List<TOut>();
+        Error? firstError = null;
 
         foreach (TIn? item in source)
         {
@@ -129,13 +132,14 @@ public static class ResultCollectionExtensions
             else
             {
                 Result<TOut>.Fail fail = (Result<TOut>.Fail)result;
-                Result<IReadOnlyList<TOut>> failOutput = new Result<IReadOnlyList<TOut>>.Fail(fail.Error);
-                RailwayLogging.Logger?.LogOperation("TraverseAsync", input, failOutput, timer.GetElapsed());
-                return failOutput;
+                firstError = fail.Error;
+                break;
             }
         }
 
-        Result<IReadOnlyList<TOut>> output = new Result<IReadOnlyList<TOut>>.Ok(results);
+        Result<IReadOnlyList<TOut>> output = firstError is not null
+            ? new Result<IReadOnlyList<TOut>>.Fail(firstError)
+            : new Result<IReadOnlyList<TOut>>.Ok(results);
         RailwayLogging.Logger?.LogOperation("TraverseAsync", input, output, timer.GetElapsed());
         return output;
     }
@@ -200,6 +204,7 @@ public static class ResultCollectionExtensions
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<T> values = new List<T>();
+        Error? firstError = null;
 
         foreach (Result<T> result in results)
         {
@@ -211,13 +216,14 @@ public static class ResultCollectionExtensions
             else
             {
                 Result<T>.Fail fail = (Result<T>.Fail)result;
-                Result<IReadOnlyList<T>> failureOutput = new Result<IReadOnlyList<T>>.Fail(fail.Error);
-                RailwayLogging.Logger?.LogOperation("Sequence", input, failureOutput, timer.GetElapsed());
-                return failureOutput;
+                firstError = fail.Error;
+                break;
             }
         }
 
-        Result<IReadOnlyList<T>> output = new Result<IReadOnlyList<T>>.Ok(values);
+        Result<IReadOnlyList<T>> output = firstError is not null
+            ? new Result<IReadOnlyList<T>>.Fail(firstError)
+            : new Result<IReadOnlyList<T>>.Ok(values);
 
         RailwayLogging.Logger?.LogOperation("Sequence", input, output, timer.GetElapsed());
 
@@ -283,6 +289,7 @@ public static class ResultCollectionExtensions
         using IRailwayTimer timer = RailwayLogging.StartOperation();
         Result<Unit> input = new Result<Unit>.Ok(Unit.Value);
         List<T> values = new List<T>();
+        Error? firstError = null;
 
         foreach (Task<Result<T>> resultTask in resultTasks)
         {
@@ -297,13 +304,14 @@ public static class ResultCollectionExtensions
             else
             {
                 Result<T>.Fail fail = (Result<T>.Fail)result;
-                Result<IReadOnlyList<T>> failureOutput = new Result<IReadOnlyList<T>>.Fail(fail.Error);
-                RailwayLogging.Logger?.LogOperation("SequenceAsync", input, failureOutput, timer.GetElapsed());
-                return failureOutput;
+                firstError = fail.Error;
+                break;
             }
         }
 
-        Result<IReadOnlyList<T>> output = new Result<IReadOnlyList<T>>.Ok(values);
+        Result<IReadOnlyList<T>> output = firstError is not null
+            ? new Result<IReadOnlyList<T>>.Fail(firstError)
+            : new Result<IReadOnlyList<T>>.Ok(values);
 
         RailwayLogging.Logger?.LogOperation("SequenceAsync", input, output, timer.GetElapsed());
 
